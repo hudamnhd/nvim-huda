@@ -1,0 +1,161 @@
+------------------------------------------------------------------------------
+INTRODUCTION                                                  *nvim-huda*
+
+Nvim-Huda is a **personal Neovim configuration** written in Lua.
+
+Features include:
+
+- Preset `vim.opt`, keymaps, autocommands, and user commands
+- Git client integration via `gitui`
+- Fuzzy search powered by `ripgrep`
+- Automatic `:nohlsearch` toggle when done searching
+- Indentation detection
+- File picker using external CLI tools: `fzf` or `nnn`
+- Buffer and bookmark pickers
+- Most recently used (MRU) file listing
+- Custom colorschemes stored in `colors/`
+
+------------------------------------------------------------------------------
+KEYMAPS                                                      *nvim-huda-keymaps*
+
+This section documents the custom keymaps set up by `nvim-huda`.
+
+All mappings are organized for clarity and utility. Most mappings use Lua
+functions internally for context-aware behavior.
+
+------------------------------------------------------------------------------
+BASIC EDITING
+
+  Normal    d, c        Blackhole delete/change (no yanking)
+  Normal    i           Smart insert (context-aware)
+  Normal    J           Join lines without moving cursor
+  Normal    gm          Duplicate line
+  Normal    <BS>        Change word/selection and repeatable
+  Normal    cu/cl/...   Change case: upper/lower/title/snake/camel
+
+------------------------------------------------------------------------------
+VISUAL MODE ENHANCEMENTS
+
+  Visual    > / <       Indent and reselect
+  Visual    I / A       Smart block insert/append
+  Visual    p           Safe paste (no register overwrite)
+  Visual    gy          Yank to system clipboard
+  Visual    gp          Paste from system clipboard
+
+------------------------------------------------------------------------------
+NAVIGATION
+
+  Normal    <A-w>       Move to next window
+  Terminal  <A-w>       Same as above (from terminal mode)
+  Normal    <C-h>       Jump to start of line
+  Normal    <C-l>       Jump to end of line
+  Normal    <C-z>       Jump to matching bracket
+  Normal    j / k       Mark and jump with count > 5
+
+------------------------------------------------------------------------------
+COMMAND LINE / REGEX
+
+  Cmdline   %%          Expand to current file dir
+  Cmdline   <F1-F3>     Common regex patterns
+  Cmdline   <C-g><C-c>  Toggle 'ignorecase' option
+  Cmdline   <C-r><C-s>  Insert visual selection into cmdline
+
+------------------------------------------------------------------------------
+SUBSTITUTION
+
+  Normal    <Leader>sv  Substitute last visual
+  Normal    <Leader>sr  Substitute last search
+  Normal    <Leader>sk  Substitute word/selection
+
+------------------------------------------------------------------------------
+TERMINAL MODE
+
+  Terminal  <C-\>       Exit terminal insert mode
+  Terminal  <A-r>       Insert register in terminal
+  Normal    <A-`>       Open new terminal in bottom split
+
+------------------------------------------------------------------------------
+MISC TOGGLES
+
+  Normal    <C-S-Q>     Switch quotes in current line
+  Normal    <C-S-W>     Toggle 'wrap' option
+  Normal    <C-S-N>     Toggle line numbers
+  Normal    <C-a>       Increment number or toggle boolean
+  Normal    <Leader>%   Set working directory to current file's dir
+
+------------------------------------------------------------------------------
+UNDO-BREAKPOINTS (INSERT MODE)
+
+  Insert    , . ;       Break undo chain for punctuation
+
+------------------------------------------------------------------------------
+SWAPPED COMMAND KEYS
+
+  Normal    ,           Opens command-line (acts like ':')
+  Normal    :           Acts like ','
+
+------------------------------------------------------------------------------
+MACRO UTILITIES
+
+  Normal    <F7>        Start macro for word
+  Normal    <F8>        End or replay macro
+
+------------------------------------------------------------------------------
+YANKING
+
+  Normal    y / Y       Smart pre-yank
+  Normal    gV          Reselect last pasted/yanked text
+
+------------------------------------------------------------------------------
+LINE ENDING MANIPULATION
+
+  Normal    d, d; d.    Toggle or replace line-ending delimiter
+
+------------------------------------------------------------------------------
+READLINE BEHAVIOR (ON INSERTENTER / CMDLINEENTER)
+
+  Insert    <C-a/b/d/f/e>  Readline-style cursor movement and deletion
+  Cmdline   <C-a/b/d/f/e>  Same as above
+
+------------------------------------------------------------------------------
+MESSAGES
+
+  Normal    <Leader>m   Show message history
+
+==============================================================================
+EXTRA FEATURES / TOOLS                                       *nvim-huda-tools*
+
+These are custom utility and terminal mappings provided by the plugin's
+`util.setup()` function, often bound to `<Leader>` or function keys.
+
+------------------------------------------------------------------------------
+EXPLORER / SEARCH
+
+  Normal    <Leader>e     Open file explorer
+  Normal    <Leader>f     Find files (non-git)
+  Normal    <Leader>F     Find git-tracked files
+  Normal    <Leader>N     Search for highlighted notes
+  Normal    <Leader>g/    Grep in current working directory (normal/visual)
+  Normal    <Leader>/     Grep in current buffer (normal/visual)
+
+------------------------------------------------------------------------------
+TERMINALS
+
+  Normal    <F1>          Open terminal #1
+  Normal    <F2>          Open terminal #2
+  Normal    <F3>          Open terminal #3 (local session)
+  Normal    <F4>          Open GitUI (terminal UI for Git)
+
+------------------------------------------------------------------------------
+SHELL & VIM COMMAND RUNNERS
+
+  Normal    <Leader>xs    Run a shell command and show output
+  Normal    <Leader>xv    Run a Vim command and show output
+
+------------------------------------------------------------------------------
+QUICKFIX & LOCATION LISTS
+
+  Normal    <Leader>Q     Open quickfix window
+  Normal    <Leader>L     Open location list window
+
+vim:tw=78:ts=8:ft=help:norl:

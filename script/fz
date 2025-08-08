@@ -1,0 +1,309 @@
+#!/usr/bin/env bash
+
+shell="$(which bash)"
+export SHELL="$shell"
+
+script_path="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)/$(basename -- "${BASH_SOURCE[0]}")"
+fzf_cmd=(fzf)
+rg_base=(rg --line-number --no-heading --smart-case --max-columns=4096)
+fzf_opts=(
+  --no-separator --header-border horizontal
+  --bind 'ctrl-a:select-all+accept'
+  --bind 'ctrl-u:preview-up'
+  --bind 'ctrl-d:preview-down'
+  --preview-window 'up,60%,border-bottom'
+  --info-command 'echo -e "\x1b[33;1m$FZF_POS\x1b[m/$FZF_INFO 💛"'
+)
+
+public_commands=("add_recent_file" "remove_recent_file" "files" "git_files" "grep" "grep_buffer")
+private_commands=("diff_preview" "transform_list_label" "grep_preview" "path_preview" "grep_preview_focus" "key_hint" "pager")
+
+_fz_path_preview() {
+  local path="$1"
+  local height
+
+  if [ -d "$path" ]; then
+    tree -C -L 2 "$path"
+  else
+    height=${FZF_PREVIEW_LINES:-$(tput lines)}
+    bat --color=always --style=numbers --line-range=:"$height" "$path"
+  fi
+}
+
+_fz_parse_grep_preview() {
+  local input="$1"
+  local fallback_file="$2"
+  local file line
+
+  if [[ "$input" =~ ^[^:]+:[0-9]+: ]]; then
+    file="${input%%:*}"
+    line="${input#*:}"
+  elif [[ "$input" =~ ^[0-9]+: ]]; then
+    file="$fallback_file"
+    line="${input%%:*}"
+  elif [[ "$input" =~ ^[^:]+:[0-9] ]]; then
+    file="${input%%:*}"
+    line="${input#*:}"
+  else
+    return 1
+  fi
+
+  line="${line%%:*}"
+  echo "$file:$line"
+}
+
+_fz_grep_preview() {
+  local input="$1"
+  local fallback_file="$2"
+  local parsed file line height half start end
+
+  parsed=$(_fz_parse_grep_preview "$input" "$fallback_file") || {
+    echo "Invalid preview format"
+    return
+  }
+
+  file="${parsed%%:*}"
+  line="${parsed##*:}"
+  height=${FZF_PREVIEW_LINES:-$(tput lines)}
+  half=$(( height / 2 ))
+  start=$(( line > half ? line - half : 1 ))
+  end=$(( line + height ))
+
+  bat --color=always --highlight-line="$line" --line-range="$start:$end" "$file"
+}
+
+_fz_grep_preview_focus() {
+  local input="$1"
+  local fallback_file="$2"
+  local parsed line
+
+  parsed=$(_fz_parse_grep_preview "$input" "$fallback_file") || {
+    echo "Invalid preview format"
+    return
+  }
+
+  line="${parsed##*:}"
+  echo "up,60%,border-bottom,+\"$line\"+3/2,~3"
+}
+
+_fz_key_hint() {
+  local key="$1"
+  local desc="$2"
+  local last="$3"
+
+  local FMT_KEY=$'\e[1;33m'
+  local FMT_SEP=$'\e[90m'
+  local FMT_RESET=$'\e[0m'
+
+  if [[ "$last" == "last" ]]; then
+    printf "%s%s%s %s" "$FMT_KEY" "$key" "$FMT_RESET" "$desc"
+  else
+    printf "%s%s%s %s %s|%s " "$FMT_KEY" "$key" "$FMT_RESET" "$desc" "$FMT_SEP" "$FMT_RESET"
+  fi
+}
+
+_fz_files() {
+  export INPUT="/tmp/fz_input.txt"
+  export NOTES_DIR="$HOME/notes"
+
+  local recent="$HOME/.cache/recent_file"
+  local cwd hint
+  cwd=$(realpath "$PWD")
+  hint=""
+
+  hint+=$("$script_path" "key_hint" "<ctrl-y>" "Files Cwd/Notes")
+  hint+=$("$script_path" "key_hint" "<ctrl-l>" "Preview file" "last")
+
+  { head -n 50 "$recent" | sed "s|^$cwd/||"; $FZF_DEFAULT_COMMAND -t d; } | awk '!seen[$0]++' > "$INPUT"
+
+  fzf_cmd+=("${fzf_opts[@]}")
+  fzf_cmd+=(
+    -1
+    --prompt 'Files> '
+    --header "$hint"
+    --bind 'ctrl-y:transform:[[ ! $FZF_PROMPT =~ Files ]] &&
+      echo "change-prompt(Files> )+reload(cat $INPUT)" ||
+      echo "change-prompt(Notes> )+reload($FZF_DEFAULT_COMMAND . $NOTES_DIR)"'
+    --bind "load:pos(2)"
+    --bind "change:first"
+    --bind 'ctrl-l:execute(bat --paging=always {})'
+    --preview "$script_path path_preview {}"
+  )
+
+  "${fzf_cmd[@]}" < "$INPUT"
+}
+
+_fz_grep() {
+  rm -f /tmp/rg-fzf-{r,f}
+  local query="" mode="fixed" filepath="" hint rg_str
+
+  for arg in "$@"; do
+    case "$arg" in
+      --query=*) query="${arg#--query=}" ;;
+      --path=*)  filepath="${arg#--path=}" ;;
+      --mode=*)  mode="${arg#--mode=}" ;;
+    esac
+  done
+
+  rg_base+=("--column")
+  hint=$("$script_path" "key_hint" "<ctrl-t>" "Switch between ripgrep/fzf" "last")
+
+  [[ "$query" =~ ^- ]] && rg_base+=("--")
+  [[ "$mode" == "fixed" ]] && rg_base+=(--fixed-strings) || rg_base+=(-e)
+  rg_str=$(printf "%q " "${rg_base[@]}")
+
+  fzf_cmd+=("${fzf_opts[@]}")
+  fzf_cmd+=(
+    --bind "start:reload:[ -z {q} ] || $rg_str {q} 2>&1 || true"
+    --bind "change:reload:[ -z {q} ] || $rg_str {q} 2>&1 || true"
+    --disabled
+    --query "$query"
+    --header "$hint"
+    --bind 'ctrl-t:transform:[[ ! $FZF_PROMPT =~ ripgrep ]] &&
+      echo "rebind(change)+change-prompt(1. ripgrep> )+disable-search+transform-query:echo {q} > /tmp/rg-fzf-f; cat /tmp/rg-fzf-r" ||
+      echo "unbind(change)+change-prompt(2. fzf> )+enable-search+transform-query:echo {q} > /tmp/rg-fzf-r; cat /tmp/rg-fzf-f"' \
+    --prompt '1. ripgrep> '
+    --bind "focus:transform:$script_path grep_preview_focus {}"
+    --preview "$script_path grep_preview {}"
+  )
+
+  "${fzf_cmd[@]}"
+}
+
+_fz_grep_buffer() {
+  local query="" line="" filepath=""
+  local input="/tmp/fz_grep_buffer.txt"
+  local rg_str fzf_index hint
+
+  for arg in "$@"; do
+    case "$arg" in
+      --query=*) query="${arg#--query=}" ;;
+      --path=*)  filepath="${arg#--path=}" ;;
+      --line=*)  line="${arg#--line=}" ;;
+      --word=*)  word="${arg#--word=}" ;;
+    esac
+  done
+
+  export FILEPATH="$filepath"
+  export input
+
+  local rg_cmd=("${rg_base[@]}")
+  if [[ -n "$query" && -n "$word" ]]; then
+      rg_cmd+=("--word-regexp" "$query")
+  else
+      rg_cmd+=("--fixed-strings" "$query")
+  fi
+  [[ -n "$filepath" ]] && rg_cmd+=("$filepath")
+
+  "${rg_cmd[@]}" > "$input" 2>/dev/null
+
+  fzf_index=$(awk -F: -v n="$line" '$1 == n { print NR; exit }' "$input")
+  fzf_index=${fzf_index:-1}
+  hint=$("$script_path" key_hint "Search:" "$query" "last")
+  rg_str=$(printf "%q " "${rg_base[@]}")
+
+  bind_reload_prompt='reload(cat $input)+unbind(change)+change-prompt(2. fzf> )+enable-search+transform-query:echo {q} > /tmp/rg-fzf-r; cat /tmp/rg-fzf-f'
+  bind_toggle_mode='[[ ! $FZF_PROMPT =~ ripgrep ]] &&
+    echo "rebind(change)+change-prompt(1. ripgrep> )+disable-search+transform-query:echo {q} > /tmp/rg-fzf-f; cat /tmp/rg-fzf-r" ||
+    echo "unbind(change)+change-prompt(2. fzf> )+enable-search+transform-query:echo {q} > /tmp/rg-fzf-r; cat /tmp/rg-fzf-f"'
+
+  fzf_cmd+=("${fzf_opts[@]}")
+  fzf_cmd+=(
+    --query "$query"
+    --disabled
+    --bind "start:transform:echo \"$bind_reload_prompt\""
+    --bind "ctrl-y:transform:echo \"$bind_reload_prompt\""
+    --bind "change:reload:[ -z {q} ] || $rg_str {q} $filepath 2>&1 || true"
+    --bind "ctrl-t:transform:$bind_toggle_mode"
+    --prompt '1. ripgrep> '
+    --bind "load:pos($fzf_index)"
+    --bind "focus:transform:$script_path grep_preview_focus {}"
+    --preview "$script_path grep_preview {} $filepath"
+    --no-multi
+    --no-sort
+  )
+
+  "${fzf_cmd[@]}"
+}
+
+_fz_git_pager() {
+  local pager
+  pager="${FZF_GIT_PAGER:-${GIT_PAGER:-$(git config --get core.pager 2>/dev/null)}}"
+  eval "${pager:-cat}"
+}
+
+_fz_transform_list_label() {
+    if [[ -z $FZF_QUERY ]]; then
+      echo " $FZF_MATCH_COUNT items "
+    else
+      echo " $FZF_MATCH_COUNT matches for [$FZF_QUERY] "
+    fi
+}
+
+_fz_diff_preview() {
+    file="$1"
+    if (git status -s -- "$file" | grep '^??') &>/dev/null; then  # diff with /dev/null for untracked files
+        git diff --color=always --no-index -- /dev/null "$file" | _fz_git_pager | sed '2 s/added:/untracked:/'
+    else
+        git diff --color=always -- "$file" | _fz_git_pager
+    fi
+}
+
+_fz_git_files() {
+  local root query
+  [[ $root != "$PWD" ]] && query='!../ '
+
+  (git -c color.status=always status --short --no-branch
+     git ls-files "${root:-.}" | grep -vxFf <(git status -s | grep '^[^?]' | cut -c4-; echo :) | sed 's/^/   /') |
+     fzf --style full \
+      -m --ansi --nth 2..,.. \
+       --padding 1,1 \
+      --input-label ' Input ' --header-label ' Diff stat ' \
+      --bind 'ctrl-l:execute(git diff --no-ext-diff --color=always -- {-1} | diff-so-fancy)' \
+      --bind 'focus:transform-preview-label:[[ -n {} ]] && printf " Previewing [%s] " {-1}' \
+      --bind "result:transform-list-label:$script_path transform_list_label" \
+      --preview-window 'right,50%' \
+      --preview "$script_path diff_preview {-1}; bat --color=always --paging=never --line-range=:50 {-1} || $script_path path_preview {-1}" "$@" |
+        cut -c4- | sed 's/.* -> //'
+}
+
+_fz_add_recent_file() {
+  local path="$1"
+  local cache="$HOME/.cache/recent_file"
+
+  [[ -z "$path" ]] && echo "No file path provided" && return 1
+  path="$(realpath -m "$path")"
+  mkdir -p "$(dirname "$cache")"
+
+  {
+    echo "$path"
+    [[ -f "$cache" ]] && cat "$cache"
+  } | awk '!seen[$0]++' | head -n 100 > "${cache}.tmp" && mv "${cache}.tmp" "$cache"
+}
+
+_fz_remove_recent_file() {
+  local path="$1"
+  local cache="$HOME/.cache/recent_file"
+
+  [[ -z "$path" ]] && echo "No file path provided" && return 1
+  path="$(realpath -m "$path")"
+  [[ ! -f "$cache" ]] && return 0
+
+  awk -v path="$path" '$0 != path' "$cache" > "${cache}.tmp" && mv "${cache}.tmp" "$cache"
+}
+
+cmd="$1"
+shift
+
+if [[ ! " ${public_commands[*]} " =~ " ${cmd} " ]] && [[ ! " ${private_commands[*]} " =~ " ${cmd} " ]]; then
+  if [[ -z "$cmd" ]]; then
+    printf "fz: missing command\n\n"
+  else
+    printf "fz: '%s' is not a valid command.\n\n" "$cmd"
+  fi
+  printf "The following commands are supported:\n"
+  printf "\t%s\n" "${public_commands[@]}"
+  exit 1
+fi
+
+_fz_"$cmd" "$@"
