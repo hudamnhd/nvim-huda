@@ -9,9 +9,12 @@ vim.g.maplocalleader = vim.keycode('<space>')
 
 local setup = function(my)
   -- │Disabled Keys│
-  map('n', '<C-r>', '<Nop>')
   map({ 'n', 'x' }, 's', '<Nop>')
   map({ 'n', 'x' }, '<Space>', '<Nop>')
+
+  -- │Change Redo│
+  map('n', '<S-u>', '<C-r>')
+  map('n', '<C-r>', '<Nop>')
 
   -- │Blackhole keys│
   map('n', 'd', '"_d')
@@ -23,7 +26,11 @@ local setup = function(my)
   map('i', ';', ';<C-g>u')
   map('i', '.', '.<C-g>u')
 
+  -- │q key, make q, not pending for open cmdline│
+  map('n', 'q', my.qkey, { expr = true })
+
   -- │Swap Command-Line│
+  map({ 'n', 'x' }, '@,', '@:')
   map({ 'n', 'x' }, ',', ':')
   map({ 'n', 'x' }, ':', ',')
 
@@ -35,11 +42,13 @@ local setup = function(my)
   map('t', '<A-w>', '<C-Bslash><C-n><C-w>w', { desc = 'Next window (terminal)' })
 
   -- │Navigation│
-  map({ 'n', 'x' }, '<C-z>', '%', { desc = 'Jump to matching bracket' })
-  map({ 'n', 'x' }, '<C-h>', '^', { desc = 'Move to start of line' })
-  map({ 'n', 'x' }, '<C-l>', 'g_', { desc = 'Move to end of line' })
   map({ 'n', 'x' }, 'j', [[(v:count > 5 ? "m'" . v:count : "") . 'j']], { desc = 'Line up', expr = true })
   map({ 'n', 'x' }, 'k', [[(v:count > 5 ? "m'" . v:count : "") . 'k']], { desc = 'Line down', expr = true })
+  map({ 'n', 'x' }, '^', my.smart_home, { expr = true, desc = 'Smart Home' })
+  map({ 'n', 'x' }, '$', my.smart_end, { expr = true, desc = 'Smart End' })
+  map({ 'n', 'x' }, '<C-h>', my.smart_home, { expr = true, desc = 'Smart Home' })
+  map({ 'n', 'x' }, '<C-l>', my.smart_end, { expr = true, desc = 'Smart End' })
+  map({ 'n', 'x' }, '<C-z>', '%', { desc = 'Jump to matching bracket' })
 
   -- │Enhancements│
   map('v', '>', '>gv')
@@ -49,15 +58,21 @@ local setup = function(my)
   map('n', 'i', my.smart_insert, { expr = true })
 
   -- │Line Manipulation│
-  map({ 'n', 'x' }, 'gm', my.duplicate_line, { desc = 'Duplicate line', expr = true })
   map('n', 'J', my.join_line, { desc = 'Join lines and keep cursor', expr = true })
+  map('', '<Leader>cl', NH.copy_line, { desc = 'Copy line', expr = true })
+
+  -- |Move lines up/down|
+  map('n', '<A-j>', "<cmd>execute 'move .+' . v:count1<cr>==", { desc = 'Move Down' })
+  map('n', '<A-k>', "<cmd>execute 'move .-' . (v:count1 + 1)<cr>==", { desc = 'Move Up' })
+  map('v', '<A-j>', ":<C-u>execute \"'<,'>move '>+\" . v:count1<cr>gv=gv", { desc = 'Move Down' })
+  map('v', '<A-k>', ":<C-u>execute \"'<,'>move '<-\" . (v:count1 + 1)<cr>gv=gv", { desc = 'Move Up' })
 
   -- │Clipboard & Yank / Paste│
   map('x', 'p', my.safe_paste, { desc = 'Paste without overwriting register', expr = true })
   map('n', 'gV', '`[v`]', { desc = 'Visual select last yank/paste' })
   map({ 'n', 'x' }, 'gy', '"+y', { desc = 'Yank to system clipboard' })
   map({ 'n', 'x' }, 'gp', '"+p', { desc = 'Paste from system clipboard' })
-  map({ 'n', 'x' }, '<Leader>r', my.register, { desc = 'register', expr = true })
+  map({ 'n', 'x' }, '<C-r>', my.register, { desc = 'Register', expr = true })
 
   -- │Case Transformation│
   map('n', 'cu', my.switch_case('upper'))
@@ -73,10 +88,12 @@ local setup = function(my)
   map('n', '<F7>', my.macro_word(true), { desc = 'Start macro for word', expr = true })
   map('n', '<F8>', my.macro_word(false), { desc = 'End/replay macro', expr = true })
 
-  -- │Substitute│
-  map('n', '<Leader>sv', my.sub_last_visual, { desc = 'Substitute last visual' })
-  map('n', '<Leader>sr', my.sub_last_search, { desc = 'Substitute last search' })
-  map({ 'n', 'x' }, '<Leader>sk', my.sub_normal_visual, { desc = 'Substitute word/selection', expr = true })
+  -- │Substitute│MAP
+  map('n', 'gsv', my.substitute_lvisual, { desc = 'Substitute last visual' })
+  map('n', 'gsr', my.substitute_lsearch, { desc = 'Substitute last search' })
+  map('n', 'gsw', my.substitute_cword, { desc = 'Substitute word' })
+  map('n', 'gsW', my.substitute_cWORD, { desc = 'Substitute WORD' })
+  map('x', 'gs', my.substitute_visual, { desc = 'Substitute selection', expr = true })
 
   -- │Cmdline / Search / Regex│
   map('x', 'g/', '<Esc>/\\%V', { desc = 'Search inside visual selection' })
@@ -84,8 +101,8 @@ local setup = function(my)
   map('c', '<F1>', [[\(.*\)]], { desc = 'Regex capture all' })
   map('c', '<F2>', [[.\{-}]], { desc = 'Regex fuzzy match' })
   map('c', '<F3>', [[\<\><left><left>]], { desc = 'Regex word boundary' })
-  map('c', '<C-r><C-s>', '<C-r>=luaeval("get_visual_selection(false)")<CR>')
-  map('c', '<C-g><C-c>', my.toggle_case, { desc = "Toggle 'case'", expr = true })
+  map('c', '<F5>', my.toggle_case, { desc = "Toggle 'case'", expr = true })
+  map('c', '<C-r><C-v>', '<C-r>=luaeval("get_visual_selection(false)")<CR>')
 
   -- │Help & Messages│
   map('n', '<Leader>m', my.cmd('messages'), { desc = 'Show messages' })
@@ -105,7 +122,8 @@ local setup = function(my)
   map('n', '<A-`>', my.cmd('botright 14split term://$SHELL'))
 
   -- │Yank│
-  map({ 'n', 'x' }, 'y', my.pre_yank(false), { expr = true })
+  map('n', 'y', my.pre_yank(false), { expr = true })
+  map('x', 'y', my.pre_yank(false), { expr = true })
   map('n', 'Y', my.pre_yank(true), { expr = true })
 
   -- │EOL Delimiter Toggle/Replace│
@@ -137,15 +155,15 @@ vim.api.nvim_create_autocmd({ 'InsertEnter', 'CmdlineEnter' }, {
   once = true,
   callback = vim.schedule_wrap(function()
     local fn, expr = vim.fn, { expr = true }
-    map('c', '<c-a>', '<home>')
-    map('i', '<c-a>', '<c-o>^')
-    map('c', '<c-b>', '<left>')
-    map('i', '<c-b>', function() return fn.getline('.'):match('^%s*$') and fn.col('.') > #fn.getline('.') and '0<C-D><Esc>kJs' or '<Left>'end, expr)
-    map('c', '<c-d>', function() return fn.getcmdpos() > #fn.getcmdline() and '<C-d>' or '<Del>' end, expr)
-    map('i', '<c-d>', function() return fn.col('.') > #fn.getline('.') and '<C-d>' or '<Del>' end, expr)
-    map('c', '<c-f>', function() return fn.getcmdpos() > #fn.getcmdline() and vim.o.cedit or '<Right>' end, expr)
-    map('i', '<c-f>', function() return fn.col('.') > #fn.getline('.') and '<C-f>' or '<Right>' end, expr)
-    map('i', '<c-e>', function() return fn.col('.') > #fn.getline('.') or fn.pumvisible() == 1 and '<C-e>' or '<End>' end, expr)
+    map('c', '<C-a>', '<home>')
+    map('i', '<C-a>', '<C-o>^')
+    map('c', '<C-b>', '<Left>')
+    map('i', '<C-b>', function() return fn.getline('.'):match('^%s*$') and fn.col('.') > #fn.getline('.') and '0<C-D><Esc>kJs' or '<Left>'end, expr)
+    map('c', '<C-d>', function() return fn.getcmdpos() > #fn.getcmdline() and '<C-d>' or '<Del>' end, expr)
+    map('i', '<C-d>', function() return fn.col('.') > #fn.getline('.') and '<C-d>' or '<Del>' end, expr)
+    map('c', '<C-f>', function() return fn.getcmdpos() > #fn.getcmdline() and vim.o.cedit or '<Right>' end, expr)
+    map('i', '<C-f>', function() return fn.col('.') > #fn.getline('.') and '<C-f>' or '<Right>' end, expr)
+    map('i', '<C-e>', function() return fn.col('.') > #fn.getline('.') or fn.pumvisible() == 1 and '<C-e>' or '<End>' end, expr)
   end),
 })
 
@@ -185,28 +203,25 @@ local function getchar()
   return nil
 end
 
---------------------------------------------------------------------------------
--- Substitutions
---------------------------------------------------------------------------------
-
-function H.sub_normal_visual()
-  if vim.fn.mode():match('[n]') then
-    return [[:%s/\<<C-r><C-w>\>/<C-r><C-w>/gI]] .. left(3)
-  elseif vim.fn.mode():match('[V]') then
+-- Substitute ------------------------------------------------------------------
+function H.substitute_visual()
+  P(vim.fn.mode():match('[\22]'))
+  if vim.fn.mode():match('[V]') then
     return ':s/\\V//gI' .. left(4)
+  elseif vim.fn.mode():match('[\22]') then
+    return ':s/\\%V//gI' .. left(4)
   else
-    local text = get_visual_selection()
+    local text = '<C-r>=luaeval("get_visual_selection()")<CR>'
     return string.format('%s/\\v%s/%s/gI%s', ':<C-u>%s', text, text, left(3))
   end
 end
 
-H.sub_last_search = ':%s///gI' .. left(3)
-H.sub_last_visual = [[:'<,'>s/\<<C-r><C-w>\>//gI]] .. left(3)
+H.substitute_lsearch = ':%s///gI' .. left(3)
+H.substitute_cword = [[:%s/\<<C-r><C-w>\>/<C-r><C-w>/gI]] .. left(3)
+H.substitute_cWORD = [[:%s/\V<C-r><C-a>/<C-r><C-a>/gI]] .. left(3)
+H.substitute_lvisual = [[:'<,'>s/\<<C-r><C-w>\>//gI]] .. left(3)
 
---------------------------------------------------------------------------------
--- Text Editing
---------------------------------------------------------------------------------
-
+-- Text Editing ----------------------------------------------------------------
 function H.join_line() return 'mz' .. vim.v.count1 .. 'J`z' end
 function H.safe_paste() return 'pgv"' .. vim.v.register .. 'y' end
 function H.insert_register_term() return '<C-\\><C-n>"' .. vim.fn.nr2char(vim.fn.getchar()) .. 'pi' end
@@ -239,35 +254,13 @@ function H.register()
   end
 end
 
---------------------------------------------------------------------------------
--- Toggle Utilities
---------------------------------------------------------------------------------
-
-do
-  local LINE_NUMBERS = {
-    ff = '  nu   rnu',
-    ft = '  nu nornu',
-    tf = 'nonu nornu',
-    tt = '  nu nornu',
-  }
-  function H.toggle_line_numbers()
-    local n = vim.o.number and 't' or 'f'
-    local r = vim.o.relativenumber and 't' or 'f'
-    local cmd = LINE_NUMBERS[n .. r]
-    vim.api.nvim_command('set ' .. cmd)
-    print(cmd)
+function H.macro_word(record)
+  return function()
+    if vim.fn.getreg('z') ~= '' then return 'n@z' end
+    if record then return '*Nqz' end
+    return vim.fn.reg_recording() == 'z' and 'q' or '*Nqz'
   end
 end
-
-function H.toggle_case()
-  vim.o.ignorecase = not vim.o.ignorecase
-  vim.o.smartcase = not vim.o.smartcase
-  return ' <Bs>' -- Refresh search
-end
-
---------------------------------------------------------------------------------
--- Word Swapping / Toggling
---------------------------------------------------------------------------------
 
 function H.inc_or_swap()
   local toggle_map = {
@@ -303,10 +296,62 @@ function H.switch_quote()
   vim.api.nvim_set_current_line(updatedLine)
 end
 
---------------------------------------------------------------------------------
--- Case Conversions
---------------------------------------------------------------------------------
+local cache_copy_line = nil
 
+NH.copy_line = function(cache)
+  if not cache then
+    cache_copy_line = nil
+    vim.go.operatorfunc = 'v:lua.NH.callback_copy_line'
+    return 'g@l'
+  end
+  if cache_copy_line then vim.cmd(cache_copy_line) end
+end
+
+NH.callback_copy_line = function(mode)
+  if mode == 'char' then
+    local line, col = unpack(vim.api.nvim_win_get_cursor(0))
+    if not cache_copy_line then cache_copy_line = 't' .. line end
+    NH.copy_line(cache_copy_line)
+    vim.api.nvim_win_set_cursor(0, { line + 1, col })
+  else
+    local line, col = unpack(vim.api.nvim_win_get_cursor(0))
+    local start_pos = vim.fn.getpos("'<")[2]
+    local end_pos = vim.fn.getpos("'>")[2]
+
+    local top = math.min(start_pos, end_pos)
+    local bottom = math.max(start_pos, end_pos)
+    local diff = bottom - top
+
+    if not cache_copy_line then cache_copy_line = top .. ',' .. bottom .. 't+' .. diff end
+    NH.copy_line(cache_copy_line)
+    vim.api.nvim_win_set_cursor(0, { line + 1 + diff, col })
+  end
+end
+
+-- Toggle Ui -------------------------------------------------------------------
+do
+  local LINE_NUMBERS = {
+    ff = '  nu   rnu',
+    ft = '  nu nornu',
+    tf = 'nonu nornu',
+    tt = '  nu nornu',
+  }
+  function H.toggle_line_numbers()
+    local n = vim.o.number and 't' or 'f'
+    local r = vim.o.relativenumber and 't' or 'f'
+    local cmd = LINE_NUMBERS[n .. r]
+    vim.api.nvim_command('set ' .. cmd)
+    print(cmd)
+  end
+end
+
+function H.toggle_case()
+  vim.o.ignorecase = not vim.o.ignorecase
+  vim.o.smartcase = not vim.o.smartcase
+  return ' <Bs>' -- Refresh search
+end
+
+-- Case Conversions ------------------------------------------------------------
 function H.switch_case(mode)
   return function()
     local line, col = unpack(vim.api.nvim_win_get_cursor(0))
@@ -334,18 +379,7 @@ function H.switch_case(mode)
   end
 end
 
---------------------------------------------------------------------------------
--- Macros & Yank Helpers
---------------------------------------------------------------------------------
-
-function H.macro_word(record)
-  if vim.fn.getreg('z') ~= '' then return 'n@z' end
-  return function()
-    if record then return '*Nqz' end
-    return vim.fn.reg_recording() == 'z' and 'q' or '*Nqz'
-  end
-end
-
+-- Pre yank --------------------------------------------------------------------
 -- Cursor restored in autocmd Hl yank
 function H.pre_yank(normal_only)
   return function()
@@ -354,10 +388,7 @@ function H.pre_yank(normal_only)
   end
 end
 
---------------------------------------------------------------------------------
--- Set cwd
---------------------------------------------------------------------------------
-
+-- Set cwd ---------------------------------------------------------------------
 function H.set_cwd()
   local file_dir = vim.fn.expand('%:h')
   vim.system({ 'git', 'rev-parse', '--show-toplevel' }, { text = true, cwd = file_dir }, function(result)
@@ -376,18 +407,34 @@ function H.set_cwd()
   end)
 end
 
---------------------------------------------------------------------------------
--- Duplicating
---------------------------------------------------------------------------------
-
-function H.duplicate_line()
-  local mode = vim.fn.mode()
-  if mode == 'n' then
-    return H.cmd('t.')
+-- Remap q, --------------------------------------------------------------------
+function H.qkey()
+  local rec = vim.fn.reg_recording()
+  if rec ~= '' then return 'q' end
+  local char = getchar()
+  if char == ',' then
+    return 'q:'
   else
-    return ':t+' .. math.abs(vim.fn.line('.') - vim.fn.line('v')) .. '<Cr>'
+    return 'q' .. char
   end
 end
+
+-- Smart Home/End Key ----------------------------------------------------------
+function H.smart_home()
+  local col = vim.fn.col('.') - 1
+  local line = vim.fn.getline('.')
+  local str_before_cursor = line:sub(1, col)
+
+  local wrap_prefix = vim.wo.wrap and 'g' or ''
+
+  if str_before_cursor:match('^%s*$') then
+    return wrap_prefix .. '0'
+  else
+    return wrap_prefix .. '^'
+  end
+end
+
+function H.smart_end() return vim.wo.wrap and 'g$' or '$' end
 
 --------------------------------------------------------------------------------
 -- Initialize

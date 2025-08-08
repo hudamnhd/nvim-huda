@@ -1,7 +1,5 @@
 local SCRIPTS_DIR = NH.PLUGIN_DIR .. '/script'
 local FZ = SCRIPTS_DIR .. '/fz'
-local LOCAL_BIN = vim.fn.expand('~/.local/bin')
-local LINK_PATH = LOCAL_BIN .. '/fz'
 
 -- Make sure it's executable
 if vim.fn.executable(FZ) == 0 then
@@ -44,7 +42,7 @@ function sink.edit_file(selected)
     elseif vim.fn.filereadable(sel) == 1 then
       vim.cmd('edit ' .. vim.fn.fnameescape(sel))
     else
-      vim.system({ 'fz', 'remove_recent_file', sel }, { text = true }, function(obj)
+      vim.system({ FZ, 'remove_recent_file', sel }, { text = true }, function(obj)
         if obj.code ~= 0 then print('Error: ' .. obj.stderr) end
       end)
       vim.notify('Cannot open: ' .. sel, vim.log.levels.WARN)
@@ -184,43 +182,6 @@ function util.get_query_arg(opts)
   return nil
 end
 
--- Optional: Create symlink to ~/.local/bin/fz if needed
-function util.symlink_fz()
-  local source, link_path = FZ, LINK_PATH
-  local stat = vim.uv.fs_stat(link_path)
-
-  if stat then
-    local real = vim.uv.fs_readlink(link_path)
-
-    if real then
-      -- It's a symlink
-      if real == source then
-        print("✅ Symlink already correct: " .. link_path)
-      else
-        print("⚠️ Symlink exists but points to: " .. real)
-        print("Skipping override to avoid conflict.")
-      end
-    else
-      -- Exists but is NOT a symlink (regular file or dir)
-      print("⚠️ Path exists and is not a symlink: " .. link_path)
-      print("Skipping to avoid overwriting existing file.")
-    end
-  else
-    -- Make sure ~/.local/bin exists
-    vim.fn.mkdir(LOCAL_BIN, "p")
-
-    -- Create symlink
-    local cmd = string.format('ln -s %s %s', vim.fn.shellescape(source), vim.fn.shellescape(link_path))
-    local ok = os.execute(cmd)
-
-    if ok == true or ok == 0 then
-      print("✅ Symlink created: " .. link_path .. " → " .. source)
-    else
-      print("❌ Failed to create symlink.")
-    end
-  end
-end
-
 -- Core ------------------------------------------------------------------------
 function util.jobstart(opts)
   local win = util.win_open(opts.win)
@@ -344,7 +305,7 @@ vim.api.nvim_create_autocmd({ 'BufEnter' }, {
     local file = vim.uv.fs_realpath(ctx.file or '')
     if not file or vim.fn.isdirectory(file) == 1 then return end
 
-    vim.system({ 'fz', 'add_recent_file', file }, { text = true }, function(obj)
+    vim.system({ FZ, 'add_recent_file', file }, { text = true }, function(obj)
       if obj.code ~= 0 then print('Error: ' .. obj.stderr) end
     end)
   end,

@@ -50,6 +50,10 @@ vim.o.softtabstop = 2 -- Soft tab behavior
 vim.o.expandtab = true -- Use spaces instead of tabs
 vim.o.smartindent = true -- Auto-indent new lines
 
+-- Visualmode
+vim.o.virtualedit   = 'block'  -- Allow going past the end of line in visual block mode
+vim.o.lazyredraw   = true  -- Aplly macro faster
+
 -- Performance
 vim.o.synmaxcol = 1500 -- Don't syntax highlight long lines
 vim.o.updatetime = 1000 -- Delay before triggering events (CursorHold)
