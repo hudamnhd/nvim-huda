@@ -39,16 +39,15 @@ local setup = function(my)
 
   -- │Window Navigation│
   map('n', '<A-w>', '<C-w>w', { desc = 'Next window' })
-  map('t', '<A-w>', '<C-Bslash><C-n><C-w>w', { desc = 'Next window (terminal)' })
+  map('n', '<A-w>', '<C-w>w', { desc = 'Next window' })
+  map('n', '<A-Tab>', '<C-w>w', { desc = 'Next window' })
+  map('t', '<A-Tab>', '<C-Bslash><C-n><C-w>w', { desc = 'Next window (terminal)' })
 
   -- │Navigation│
   map({ 'n', 'x' }, 'j', [[(v:count > 5 ? "m'" . v:count : "") . 'j']], { desc = 'Line up', expr = true })
   map({ 'n', 'x' }, 'k', [[(v:count > 5 ? "m'" . v:count : "") . 'k']], { desc = 'Line down', expr = true })
   map({ 'n', 'x' }, '^', my.smart_home, { expr = true, desc = 'Smart Home' })
   map({ 'n', 'x' }, '$', my.smart_end, { expr = true, desc = 'Smart End' })
-  map({ 'n', 'x' }, '<C-h>', my.smart_home, { expr = true, desc = 'Smart Home' })
-  map({ 'n', 'x' }, '<C-l>', my.smart_end, { expr = true, desc = 'Smart End' })
-  map({ 'n', 'x' }, '<C-z>', '%', { desc = 'Jump to matching bracket' })
 
   -- │Enhancements│
   map('v', '>', '>gv')
@@ -59,7 +58,7 @@ local setup = function(my)
 
   -- │Line Manipulation│
   map('n', 'J', my.join_line, { desc = 'Join lines and keep cursor', expr = true })
-  map('', '<Leader>cl', NH.copy_line, { desc = 'Copy line', expr = true })
+  map('', '<Leader>t.', NH.copy_line, { desc = 'Copy line (default t. or t+)', expr = true })
 
   -- |Move lines up/down|
   map('n', '<A-j>', "<cmd>execute 'move .+' . v:count1<cr>==", { desc = 'Move Down' })
@@ -79,7 +78,7 @@ local setup = function(my)
   map('n', 'cl', my.switch_case('lower'))
   map('n', 'ct', my.switch_case('title'))
   map('n', 'cn', my.switch_case('snake'))
-  map('n', 'cc', my.switch_case('camel'))
+  map('n', 'cm', my.switch_case('camel'))
 
   -- │Change text│
   map({ 'n', 'x' }, '<BS>', my.change_and_repeatable, { desc = 'Change word/selection', expr = true })
@@ -96,7 +95,7 @@ local setup = function(my)
   map('x', 'gs', my.substitute_visual, { desc = 'Substitute selection', expr = true })
 
   -- │Cmdline / Search / Regex│
-  map('x', 'g/', '<Esc>/\\%V', { desc = 'Search inside visual selection' })
+  map('x', 'gf', my.gf, { desc = 'Search inside visual selection', expr = true })
   map('c', '%%', [[getcmdtype() == ':' ? expand('%:h') . '/' : '%%']], { expr = true })
   map('c', '<F1>', [[\(.*\)]], { desc = 'Regex capture all' })
   map('c', '<F2>', [[.\{-}]], { desc = 'Regex fuzzy match' })
@@ -108,9 +107,9 @@ local setup = function(my)
   map('n', '<Leader>m', my.cmd('messages'), { desc = 'Show messages' })
 
   -- │Miscellaneous Toggles│
-  map('n', '<C-S-Q>', my.switch_quote, { desc = 'Switch quotes in line' })
-  map('n', '<C-S-W>', my.cmd('setlocal wrap! wrap?'), { desc = "Toggle 'wrap' option" })
-  map('n', '<C-S-N>', my.toggle_line_numbers, { desc = "Toggle 'line number' option" })
+  map('n', '<Leader>cq', my.toggle_quotes, { desc = 'Switch quotes in line' })
+  map('n', '<Leader>uw', my.cmd('setlocal wrap! wrap?'), { desc = "Toggle 'wrap' option" })
+  map('n', '<Leader>un', my.toggle_line_numbers, { desc = "Toggle 'line number' option" })
   map('n', '<C-a>', my.inc_or_swap, { desc = 'Increment or swap boolean' })
 
   -- │Smart Utilities│
@@ -122,8 +121,7 @@ local setup = function(my)
   map('n', '<A-`>', my.cmd('botright 14split term://$SHELL'))
 
   -- │Yank│
-  map('n', 'y', my.pre_yank(false), { expr = true })
-  map('x', 'y', my.pre_yank(false), { expr = true })
+  map({ 'n', 'x' }, 'y', my.pre_yank(false), { expr = true })
   map('n', 'Y', my.pre_yank(true), { expr = true })
 
   -- │EOL Delimiter Toggle/Replace│
@@ -205,14 +203,16 @@ end
 
 -- Substitute ------------------------------------------------------------------
 function H.substitute_visual()
-  P(vim.fn.mode():match('[\22]'))
-  if vim.fn.mode():match('[V]') then
-    return ':s/\\V//gI' .. left(4)
-  elseif vim.fn.mode():match('[\22]') then
-    return ':s/\\%V//gI' .. left(4)
-  else
-    local text = '<C-r>=luaeval("get_visual_selection()")<CR>'
-    return string.format('%s/\\v%s/%s/gI%s', ':<C-u>%s', text, text, left(3))
+  local mode = vim.fn.mode()
+  local selection_cmd = '<C-r>=luaeval("get_visual_selection()")<CR>'
+  local base_cmd, flags = ':s/', '/gI'
+
+  if mode == 'V' then -- Linewise visual
+    return base_cmd .. [[\V/]] .. flags .. left(4)
+  elseif mode == '\22' then -- Blockwise visual (CTRL-V)
+    return base_cmd .. [[\%V/]] .. flags .. left(4)
+  else -- Characterwise visual
+    return string.format(':<C-u>%%s/\\v%s/%s%s%s', selection_cmd, selection_cmd, flags, left(3))
   end
 end
 
@@ -290,7 +290,7 @@ function H.inc_or_swap()
   end
 end
 
-function H.switch_quote()
+function H.toggle_quotes()
   local line = vim.api.nvim_get_current_line()
   local updatedLine = line:gsub('["\']', function(q) return (q == [["]] and [[']] or [["]]) end)
   vim.api.nvim_set_current_line(updatedLine)
@@ -419,6 +419,16 @@ function H.qkey()
   end
 end
 
+-- Remap q, --------------------------------------------------------------------
+function H.gf()
+  local mode = vim.fn.mode()
+  if mode:match('[V\22]') then
+    return '<Esc>/\\%V' -- code untuk V atau CTRL-V (block visual)
+  else
+    return 'gf'
+  end
+end
+
 -- Smart Home/End Key ----------------------------------------------------------
 function H.smart_home()
   local col = vim.fn.col('.') - 1
@@ -435,6 +445,73 @@ function H.smart_home()
 end
 
 function H.smart_end() return vim.wo.wrap and 'g$' or '$' end
+
+-- Utils Operator Function -----------------------------------------------------
+local function get_mark(mark)
+  local pos = vim.api.nvim_buf_get_mark(0, mark)
+  if pos[1] == 0 then return nil end
+  pos[2] = pos[2] + 1
+  return pos
+end
+
+local function get_str(mode, first_pos, last_pos)
+  -- different types of operator funcs need different ways of getting lines
+  if mode == 'line' then
+    return vim.api.nvim_buf_get_lines(0, first_pos[1] - 1, last_pos[1], false)
+  elseif mode == 'char' then
+    return vim.api.nvim_buf_get_text(
+      0,
+      first_pos[1] - 1, -- row
+      first_pos[2] - 1, -- col
+      last_pos[1] - 1, -- row
+      last_pos[2], -- col
+      {}
+    )
+  else
+    print('mode ' .. mode .. ' is un-supported')
+    return
+  end
+end
+
+local function create_opfunc(callback, allow_multiline)
+  return function(mode)
+    local first_pos, last_pos = get_mark('['), get_mark(']')
+    local lines = get_str(mode, first_pos, last_pos)
+    if not lines then return end
+
+    if allow_multiline or #lines > 1 then
+      return callback(lines)
+    else
+      return callback(lines[1])
+    end
+  end
+end
+
+function H.opfunc(callback, opts)
+  opts = opts or {}
+  local allow_multiline = opts.multiline or false
+  NH._opfunc = create_opfunc(callback, allow_multiline)
+  vim.go.operatorfunc = 'v:lua.NH._opfunc'
+  return 'g@'
+end
+
+function H.substitute_opfunc()
+  local mode = vim.fn.mode()
+  local base_cmd, flags = ':s/', '/gI'
+
+  if mode == 'V' then -- Visual line mode
+    return base_cmd .. [[\V/]] .. flags .. left(4)
+  elseif mode == '\22' then -- Visual block mode (Ctrl-V)
+    return base_cmd .. [[\%V/]] .. flags .. left(4)
+  else -- Visual charwise atau operatorfunc charwise
+    return H.opfunc(function(result)
+      local left = vim.keycode('<Left>')
+      local escaped = vim.fn.escape(result, escape_characters)
+      local command = ':%s/\\v' .. escaped .. '/' .. result .. '/gI'
+      vim.api.nvim_feedkeys(command .. string.rep(left, 3), 'n', true)
+    end)
+  end
+end
 
 --------------------------------------------------------------------------------
 -- Initialize

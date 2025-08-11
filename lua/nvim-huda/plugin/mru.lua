@@ -24,7 +24,6 @@ function M.add(file_path)
   table.insert(mru_list, 1, file_path)
   mru_set[file_path] = true
 
-  -- Potong kalau terlalu banyak
   if #mru_list > max_entries then
     for i = max_entries + 1, #mru_list do
       mru_set[mru_list[i]] = nil

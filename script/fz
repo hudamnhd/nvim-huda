@@ -15,7 +15,7 @@ fzf_opts=(
   --info-command 'echo -e "\x1b[33;1m$FZF_POS\x1b[m/$FZF_INFO 💛"'
 )
 
-public_commands=("add_recent_file" "remove_recent_file" "files" "git_files" "grep" "grep_buffer")
+public_commands=("add_recent_file" "remove_recent_file" "files" "smart_files" "git_files" "grep" "grep_buffer")
 private_commands=("diff_preview" "transform_list_label" "grep_preview" "path_preview" "grep_preview_focus" "key_hint" "pager")
 
 _fz_path_preview() {
@@ -103,6 +103,36 @@ _fz_key_hint() {
 }
 
 _fz_files() {
+  local cwd hint cmd
+
+  # Default command
+  cmd="$FZF_DEFAULT_COMMAND"
+
+  # Parse argumen
+  for arg in "$@"; do
+    case "$arg" in
+      --cmd=*) cmd="${arg#--cmd=}" ;;
+    esac
+  done
+
+  cwd=$(realpath "$PWD")
+  hint=""
+
+  hint+=$("$script_path" "key_hint" "<ctrl-l>" "Preview file" "last")
+
+  fzf_cmd+=("${fzf_opts[@]}")
+  fzf_cmd+=(
+    --prompt "$cwd> "
+    --header "$hint"
+    --bind "change:first"
+    --bind 'ctrl-l:execute(bat --paging=always {})'
+    --preview "$script_path path_preview {}"
+  )
+
+   eval "$cmd" | "${fzf_cmd[@]}"
+}
+
+_fz_smart_files() {
   export INPUT="/tmp/fz_input.txt"
   export NOTES_DIR="$HOME/notes"
 
@@ -114,7 +144,7 @@ _fz_files() {
   hint+=$("$script_path" "key_hint" "<ctrl-y>" "Files Cwd/Notes")
   hint+=$("$script_path" "key_hint" "<ctrl-l>" "Preview file" "last")
 
-  { head -n 50 "$recent" | sed "s|^$cwd/||"; $FZF_DEFAULT_COMMAND -t d; } | awk '!seen[$0]++' > "$INPUT"
+  { head -n 15 "$recent" | sed "s|^$cwd/||"; $FZF_DEFAULT_COMMAND -t d; } | awk '!seen[$0]++' > "$INPUT"
 
   fzf_cmd+=("${fzf_opts[@]}")
   fzf_cmd+=(
@@ -199,7 +229,14 @@ _fz_grep_buffer() {
 
   fzf_index=$(awk -F: -v n="$line" '$1 == n { print NR; exit }' "$input")
   fzf_index=${fzf_index:-1}
-  hint=$("$script_path" key_hint "Search:" "$query" "last")
+
+  if [[ -n "$query" ]]; then
+    hint+=$("$script_path" "key_hint" "<ctrl-t>" "Switch between ripgrep/fzf")
+    hint+=$("$script_path" "key_hint" "<ctrl-y>" "Restore first query")
+    hint+=$("$script_path" "key_hint" "Search:" "$query" "last")
+  else
+    hint+=$("$script_path" "key_hint" "<ctrl-t>" "Switch between ripgrep/fzf" "last")
+  fi
   rg_str=$(printf "%q " "${rg_base[@]}")
 
   bind_reload_prompt='reload(cat $input)+unbind(change)+change-prompt(2. fzf> )+enable-search+transform-query:echo {q} > /tmp/rg-fzf-r; cat /tmp/rg-fzf-f'
@@ -215,6 +252,7 @@ _fz_grep_buffer() {
     --bind "ctrl-y:transform:echo \"$bind_reload_prompt\""
     --bind "change:reload:[ -z {q} ] || $rg_str {q} $filepath 2>&1 || true"
     --bind "ctrl-t:transform:$bind_toggle_mode"
+    --header "$hint"
     --prompt '1. ripgrep> '
     --bind "load:pos($fzf_index)"
     --bind "focus:transform:$script_path grep_preview_focus {}"

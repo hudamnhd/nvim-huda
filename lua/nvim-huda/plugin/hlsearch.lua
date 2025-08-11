@@ -24,6 +24,18 @@ local function show_search_count(mode)
   })
 end
 
+vim.keymap.set('', '*', function()
+  if vim.fn.mode():match('[n]') then
+    local text = vim.fn.expand('<cword>')
+    vim.fn.setreg('/', '\\<' .. text .. '\\>')
+  elseif vim.fn.mode():match('[v]') then
+    local text = get_visual_selection(false)
+    vim.fn.setreg('/', '\\V' .. text)
+  end
+  vim.opt.hlsearch = true
+  show_search_count()
+end, { silent = true, desc = '*, but stay on the current search result' })
+
 -- Auto toggle hlsearch & display match count
 vim.on_key(function(key)
   key = vim.fn.keytrans(key)

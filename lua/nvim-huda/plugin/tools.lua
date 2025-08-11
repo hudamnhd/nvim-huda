@@ -14,29 +14,36 @@ if vim.fn.executable('nnn') == 0 and vim.fn.executable('fzf') == 0 and vim.fn.ex
 
 -- Keymap  --------------------------------------------------------------------
 function util.setup()
-  vim.keymap.set('n', '<Leader>e', T.explorer, { desc = 'Explorer' })
-  vim.keymap.set('n', '<Leader>f', T.find_files, { desc = 'Files' })
-  vim.keymap.set('n', '<Leader>F', T.git_files, { desc = 'Git files' })
-  vim.keymap.set('n', '<Leader>N', T.grep_note, { desc = 'Search hl note' })
+  vim.keymap.set('n', '<Leader>e', T.explorer, { desc = 'Open directory current file' })
+  vim.keymap.set('n', '<Leader>.', T.explorer, { desc = 'Open directory current file' })
 
-  vim.keymap.set('n', '<Leader>Q', T.open_win_qf('q'), { desc = 'Quickfix List' })
-  vim.keymap.set('n', '<Leader>L', T.open_win_qf('l'), { desc = 'Location List' })
+  vim.keymap.set('n', '<Leader>f', T.find_files, { desc = 'Open file picker at cwd' })
+  vim.keymap.set('n', '<Leader>F', T.git_files, { desc = 'Open file picker at git root' })
 
+  vim.keymap.set('n', '<Leader>g/', T.grep, { desc = 'Search in workspace folder' })
+  vim.keymap.set('n', '<Leader>/', T.bgrep, { desc = 'Search in current file' })
+
+  vim.keymap.set({ 'n', 'x' }, '<Leader>sg', T.grep_global, { desc = 'Search word/selection in workspace folder' })
+  vim.keymap.set({ 'n', 'x' }, '<Leader>sb', T.grep_buffer, { desc = 'Search word/selection in current file' })
+
+  vim.keymap.set('n', '<Leader>xq', T.open_win_qf('q'), { desc = 'Quickfix List' })
+  vim.keymap.set('n', '<Leader>xl', T.open_win_qf('l'), { desc = 'Location List' })
   vim.keymap.set('n', '<Leader>xs', T.run_shell, { desc = 'Run and open result shell cmd' })
   vim.keymap.set('n', '<Leader>xv', T.run_vim, { desc = 'Run and open result vim cmd' })
-
-  vim.keymap.set({ 'n', 'x' }, '<Leader>g/', T.grep_global, { desc = 'Grep current cwd' })
-  vim.keymap.set({ 'n', 'x' }, '<Leader>/', T.grep_buffer, { desc = 'Grep current file' })
+  vim.keymap.set('n', '<Leader>xg', T.open_gitui, { desc = 'Open gitui' })
+  vim.keymap.set('n', '<Leader>xn', T.grep_note, { desc = 'Search highlight text "NOTE/FIXME/TODO/HACK"' })
+  vim.keymap.set('n', '<Leader>xb', T.find_dir, { desc = 'Open bookmark directory ~/.bookmarks' })
 
   vim.keymap.set({ 'n', 't' }, '<F1>', T.term_1, { desc = 'term 1' })
   vim.keymap.set({ 'n', 't' }, '<F2>', T.term_2, { desc = 'term 2' })
   vim.keymap.set({ 'n', 't' }, '<F3>', T.term_3, { desc = 'term 3 (local)' })
-  vim.keymap.set({ 'n', 't' }, '<F4>', T.gitui, { desc = 'Gitui' })
 end
 
 -- Sink ------------------------------------------------------------------------
-function sink.edit_file(selected)
+function sink.edit_file(selected, opts)
+  local cwd = vim.uv.cwd()
   for i, sel in ipairs(selected) do
+    if cwd ~= opts.cwd then sel = vim.fs.joinpath(opts.cwd, sel) end
     if vim.fn.isdirectory(sel) == 1 then
       if i == #selected then vim.cmd('edit ' .. vim.fn.fnameescape(sel)) end
     elseif vim.fn.filereadable(sel) == 1 then
@@ -187,12 +194,15 @@ function util.jobstart(opts)
   local win = util.win_open(opts.win)
   local query = util.get_query_arg(opts)
 
+  if opts.on_enter then opts.on_enter() end
+
+  local cwd = vim.uv.cwd()
   vim.bo[win.buf_id].bufhidden = 'wipe'
   vim.bo[win.buf_id].buftype = 'nofile'
 
   local function callback()
     vim.defer_fn(function()
-      if vim.fn.filereadable(TEMPNAME) == 1 then opts.sink(vim.fn.readfile(TEMPNAME), query) end
+      if vim.fn.filereadable(TEMPNAME) == 1 then opts.sink(vim.fn.readfile(TEMPNAME), { query = query, cwd = cwd }) end
     end, 50)
   end
 
@@ -215,6 +225,7 @@ function util.fzf_cmd(opts)
     win = vim.tbl_deep_extend('force', util.get_float_opts(), { title = opts.title }),
     sink = opts.sink,
     args = args,
+    on_enter = opts.on_enter,
   })
 end
 
@@ -237,7 +248,28 @@ end
 -- Fd      | https://github.com/sharkdp/fd
 -- Ripgrep | https://github.com/BurntSushi/ripgrep
 --------------------------------------------------------------------------------
-T.find_files = function() util.fzf_cmd({ title = 'Files', cmd = 'files', sink = sink.edit_file }) end
+local default_find_files = {
+  title = 'Files',
+  cmd = 'files',
+  sink = sink.edit_file,
+}
+
+vim.api.nvim_create_user_command('F', function(info)
+  -- local cwd = info.fargs[1] and vim.fn.fnamemodify(info.fargs[1], ':p') or vim.uv.cwd()
+  local cwd = info.fargs[1] or vim.uv.cwd()
+  util.fzf_cmd(vim.tbl_deep_extend('force', default_find_files, { on_enter = function() vim.cmd('lcd ' .. cwd) end }))
+end, { nargs = '?', complete = 'dir', desc = 'Fuzzy find files.' })
+
+T.find_dir = function()
+  util.fzf_cmd({
+    title = 'Directory',
+    cmd = 'files',
+    args = '--cmd="cat ~/.bookmarks"',
+    sink = function(selected) vim.cmd('F ' .. selected[1]) end,
+  })
+end
+
+T.find_files = function() util.fzf_cmd(vim.tbl_deep_extend('force', default_find_files, { cmd = 'smart_files' })) end
 T.git_files = function() util.fzf_cmd({ title = 'Git Files', cmd = 'git_files', sink = sink.edit_file }) end
 T.grep = function() util.fzf_cmd({ title = 'Grep', cmd = 'grep', sink = sink.edit_or_sel_to_qf }) end
 T.grep_global = function()
@@ -252,6 +284,21 @@ T.grep_note = function()
 end
 T.grep_buffer = function()
   local query = util.get_word_or_selection()
+  local line = unpack(vim.api.nvim_win_get_cursor(0))
+  local current_file = vim.api.nvim_buf_get_name(0)
+  local word = vim.fn.mode() == 'n' and ' --word=' .. query or ''
+  local args = string.format('--query=%s --path=%s --line=%d%s', vim.fn.shellescape(query), current_file, line, word)
+  print('DEBUG[452]: tools.lua:287: args=' .. vim.inspect(args))
+  util.fzf_cmd({
+    title = 'Grep Buffer',
+    cmd = 'grep_buffer',
+    sink = sink.go_to_line,
+    args = args,
+  })
+  util.extra_hl(query)
+end
+T.bgrep = function()
+  local query = ''
   local line = unpack(vim.api.nvim_win_get_cursor(0))
   local current_file = vim.api.nvim_buf_get_name(0)
   local args = string.format('--query=%s --path=%s --line=%d', vim.fn.shellescape(query), current_file, line)
@@ -455,7 +502,7 @@ do
     vim.fn.system({ 'chmod', '+x', editor_script })
   end
 
-  function T.gitui()
+  function T.open_gitui()
     vim.cmd('tabedit')
     vim.cmd('setlocal nonumber signcolumn=no')
 
