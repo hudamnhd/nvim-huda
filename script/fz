@@ -8,10 +8,10 @@ fzf_cmd=(fzf)
 rg_base=(rg --line-number --no-heading --smart-case --max-columns=4096)
 fzf_opts=(
   --no-separator --header-border horizontal
-  --bind 'ctrl-a:select-all+accept'
+  --bind 'alt-q:select-all+accept'
   --bind 'ctrl-u:preview-up'
   --bind 'ctrl-d:preview-down'
-  --preview-window 'up,60%,border-bottom'
+  --preview-window 'right,55%,border-left'
   --info-command 'echo -e "\x1b[33;1m$FZF_POS\x1b[m/$FZF_INFO 💛"'
 )
 

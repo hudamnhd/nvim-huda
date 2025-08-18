@@ -2,7 +2,6 @@
 -- Keymap
 --------------------------------------------------------------------------------
 local map = vim.keymap.set
-
 -- │Leader Key│
 vim.g.mapleader = vim.keycode('<space>')
 vim.g.maplocalleader = vim.keycode('<space>')
@@ -30,18 +29,16 @@ local setup = function(my)
   map('n', 'q', my.qkey, { expr = true })
 
   -- │Swap Command-Line│
-  map({ 'n', 'x' }, '@,', '@:')
-  map({ 'n', 'x' }, ',', ':')
-  map({ 'n', 'x' }, ':', ',')
+  map({ 'n', 'x' }, '@;', '@:')
+  map({ 'n', 'x' }, ';', ':')
+  map({ 'n', 'x' }, ':', ';')
 
   -- │Buffer delete│
   map('n', '<Leader>q', my.cmd('bd'), { desc = 'Delete buffer' })
 
   -- │Window Navigation│
   map('n', '<A-w>', '<C-w>w', { desc = 'Next window' })
-  map('n', '<A-w>', '<C-w>w', { desc = 'Next window' })
-  map('n', '<A-Tab>', '<C-w>w', { desc = 'Next window' })
-  map('t', '<A-Tab>', '<C-Bslash><C-n><C-w>w', { desc = 'Next window (terminal)' })
+  map('t', '<A-w>', '<C-Bslash><C-n><C-w>w', { desc = 'Next window (terminal)' })
 
   -- │Navigation│
   map({ 'n', 'x' }, 'j', [[(v:count > 5 ? "m'" . v:count : "") . 'j']], { desc = 'Line up', expr = true })
@@ -59,6 +56,7 @@ local setup = function(my)
   -- │Line Manipulation│
   map('n', 'J', my.join_line, { desc = 'Join lines and keep cursor', expr = true })
   map('', '<Leader>t.', NH.copy_line, { desc = 'Copy line (default t. or t+)', expr = true })
+  map('i', '<C-r><C-v>', my.insert_last_selection, { desc = 'Insert last visual selection' })
 
   -- |Move lines up/down|
   map('n', '<A-j>', "<cmd>execute 'move .+' . v:count1<cr>==", { desc = 'Move Down' })
@@ -83,24 +81,17 @@ local setup = function(my)
   -- │Change text│
   map({ 'n', 'x' }, '<BS>', my.change_and_repeatable, { desc = 'Change word/selection', expr = true })
 
-  -- │Macro Utilities│
-  map('n', '<F7>', my.macro_word(true), { desc = 'Start macro for word', expr = true })
-  map('n', '<F8>', my.macro_word(false), { desc = 'End/replay macro', expr = true })
-
   -- │Substitute│MAP
-  map('n', 'gsv', my.substitute_lvisual, { desc = 'Substitute last visual' })
-  map('n', 'gsr', my.substitute_lsearch, { desc = 'Substitute last search' })
-  map('n', 'gsw', my.substitute_cword, { desc = 'Substitute word' })
-  map('n', 'gsW', my.substitute_cWORD, { desc = 'Substitute WORD' })
-  map('x', 'gs', my.substitute_visual, { desc = 'Substitute selection', expr = true })
+  map('n', 's/', my.substitute_lsearch, { desc = 'Substitute last search' })
+  map('n', 'sv', my.substitute_lvisual, { desc = 'Substitute last visual' })
+  map({ 'n', 'x' }, 'sc', my.smart_substitute, { desc = 'Substitute word or visual selection', expr = true })
 
   -- │Cmdline / Search / Regex│
-  map('x', 'gf', my.gf, { desc = 'Search inside visual selection', expr = true })
+  map('v', 'gf', my.gf, { desc = 'Search inside visual selection', expr = true })
   map('c', '%%', [[getcmdtype() == ':' ? expand('%:h') . '/' : '%%']], { expr = true })
-  map('c', '<F1>', [[\(.*\)]], { desc = 'Regex capture all' })
-  map('c', '<F2>', [[.\{-}]], { desc = 'Regex fuzzy match' })
-  map('c', '<F3>', [[\<\><left><left>]], { desc = 'Regex word boundary' })
-  map('c', '<F5>', my.toggle_case, { desc = "Toggle 'case'", expr = true })
+  map('c', '<C-x><C-g>', [[\(.*\)]], { desc = 'Regex capture all' })
+  map('c', '<C-x><C-f>', [[.\{-}]], { desc = 'Regex fuzzy match' })
+  map('c', '<C-x><C-c>', my.toggle_case, { desc = "Toggle 'case'", expr = true })
   map('c', '<C-r><C-v>', '<C-r>=luaeval("get_visual_selection(false)")<CR>')
 
   -- │Help & Messages│
@@ -142,6 +133,31 @@ local setup = function(my)
 
       vim.api.nvim_set_current_line(new)
     end, {})
+  end
+
+  -- │Better ^$│
+  map({ 'n', 'x' }, '<C-e>', function()
+    local col = vim.fn.col('.')
+    local line = vim.fn.getline('.')
+    local first_nonblank = vim.fn.match(line, '\\S') + 1
+    local last_nonblank = #line
+
+    if col == last_nonblank + 1 then
+      return '^'
+    elseif col == first_nonblank then
+      return '$'
+    else
+      return '^'
+    end
+  end, { desc = 'Goto line start/end', noremap = true, expr = true })
+
+  -- │Macro│
+  do
+    local reg = 'r'
+    local toggle_key = '<F7>'
+    vim.fn.setreg(reg, '')
+    map('n', toggle_key, function() my.start_or_stop_recording(toggle_key, reg) end, { desc = ' Start/stop recording' })
+    map('n', '<F8>', function() my.play_recording(reg) end, { desc = 'Play recording' })
   end
 end
 
@@ -202,12 +218,14 @@ local function getchar()
 end
 
 -- Substitute ------------------------------------------------------------------
-function H.substitute_visual()
+function H.smart_substitute()
   local mode = vim.fn.mode()
   local selection_cmd = '<C-r>=luaeval("get_visual_selection()")<CR>'
   local base_cmd, flags = ':s/', '/gI'
 
-  if mode == 'V' then -- Linewise visual
+  if mode == 'n' then -- Cword normal
+    return [[:%s/\<<C-r><C-w>\>/<C-r><C-w>/gI]] .. left(3)
+  elseif mode == 'V' then -- Linewise visual
     return base_cmd .. [[\V/]] .. flags .. left(4)
   elseif mode == '\22' then -- Blockwise visual (CTRL-V)
     return base_cmd .. [[\%V/]] .. flags .. left(4)
@@ -227,6 +245,9 @@ function H.safe_paste() return 'pgv"' .. vim.v.register .. 'y' end
 function H.insert_register_term() return '<C-\\><C-n>"' .. vim.fn.nr2char(vim.fn.getchar()) .. 'pi' end
 function H.nice_block_I() return vim.fn.mode():match('[vV]') and '<C-v>^o^I' or 'I' end
 function H.nice_block_A() return vim.fn.mode():match('[vV]') and '<C-v>1o$A' or 'A' end
+function H.insert_last_selection()
+  vim.api.nvim_set_current_line(vim.api.nvim_get_current_line() .. get_visual_selection(false))
+end
 
 function H.smart_insert()
   local mode = vim.api.nvim_get_mode().mode
@@ -249,16 +270,44 @@ end
 function H.register()
   local char_1 = getchar()
   if char_1 then
-    local char_2 = getchar()
-    return string.format('"%s%s', char_1, char_2)
+    if char_1 == '\22' then
+      vim.fn.setreg('v', get_visual_selection(false))
+      return '"vp'
+    else
+      local char_2 = getchar()
+      return string.format('"%s%s', char_1, char_2)
+    end
   end
 end
 
-function H.macro_word(record)
-  return function()
-    if vim.fn.getreg('z') ~= '' then return 'n@z' end
-    if record then return '*Nqz' end
-    return vim.fn.reg_recording() == 'z' and 'q' or '*Nqz'
+function H.start_or_stop_recording(toggle_key, reg)
+  local is_not_recording = vim.fn.reg_recording() == ''
+  if is_not_recording then
+    vim.cmd.normal({ 'q' .. reg, bang = true }) -- start recording to register
+    return
+  end
+
+  local previous_macro = vim.fn.getreg(reg)
+  vim.cmd.normal({ 'q', bang = true })
+
+  local current_macro = vim.fn.getreg(reg):sub(1, -(#toggle_key + 1)) -- remove the toggle key itself
+  if current_macro ~= '' then
+    vim.fn.setreg(reg, current_macro)
+    local macro_display = vim.fn.keytrans(current_macro)
+    vim.notify(macro_display, vim.log.levels.TRACE, { title = 'Recorded', icon = '󰃽' })
+  else
+    vim.fn.setreg(reg, previous_macro) -- restore previous macro if current is empty
+    vim.notify('Aborted.', vim.log.levels.TRACE, { title = 'Recording', icon = '󰃾' })
+  end
+end
+
+---@param reg string vim register (single letter)
+function H.play_recording(reg)
+  local has_recording = vim.fn.getreg(reg) ~= ''
+  if has_recording then
+    vim.cmd.normal({ '@' .. reg, bang = true })
+  else
+    vim.notify('There is no recording.', vim.log.levels.WARN, { title = 'Recording', icon = '󰃾' })
   end
 end
 
@@ -412,7 +461,7 @@ function H.qkey()
   local rec = vim.fn.reg_recording()
   if rec ~= '' then return 'q' end
   local char = getchar()
-  if char == ',' then
+  if char == ';' then
     return 'q:'
   else
     return 'q' .. char
@@ -423,7 +472,7 @@ end
 function H.gf()
   local mode = vim.fn.mode()
   if mode:match('[V\22]') then
-    return '<Esc>/\\%V' -- code untuk V atau CTRL-V (block visual)
+    return '<Esc>/\\%V'
   else
     return 'gf'
   end

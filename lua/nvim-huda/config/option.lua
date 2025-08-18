@@ -8,7 +8,7 @@ vim.o.relativenumber = true -- Show relative numbers
 vim.o.signcolumn = 'yes' -- Always show sign column
 vim.o.title = true -- Enable terminal title
 vim.o.showmode = false -- Disable "-- INSERT --" mode since using statusline
-vim.o.laststatus = 3 -- Global statusline (last window only)
+-- vim.o.laststatus = 3 -- Global statusline (last window only)
 vim.o.mouse = 'a' -- Enable mouse support
 vim.o.termguicolors = true -- Enable 24-bit RGB colors (important for tmux)
 vim.o.titlestring = [[%{&modified?'** ':''}%{empty(expand('%:F'))?'Nvim': 'Nvim: ' . expand('%:F')}]]
@@ -16,6 +16,7 @@ vim.o.list = true
 vim.opt.listchars = { tab = '▏ ', trail = '·', extends = '»', precedes = '«' }
 
 if vim.fn.has('nvim-0.12') == 1 then
+  vim.o.cmdheight = 0
   vim.o.pummaxwidth = 30 -- Limit maximum width of popup menu
   vim.o.completefuzzycollect = 'keyword,files,whole_line' -- Use fuzzy matching when collecting candidates
 
@@ -51,8 +52,8 @@ vim.o.expandtab = true -- Use spaces instead of tabs
 vim.o.smartindent = true -- Auto-indent new lines
 
 -- Visualmode
-vim.o.virtualedit   = 'block'  -- Allow going past the end of line in visual block mode
-vim.o.lazyredraw   = true  -- Aplly macro faster
+vim.o.virtualedit = 'block' -- Allow going past the end of line in visual block mode
+vim.o.lazyredraw = true -- Aplly macro faster
 
 -- Performance
 vim.o.synmaxcol = 1500 -- Don't syntax highlight long lines
@@ -61,10 +62,10 @@ vim.o.timeoutlen = 1000 -- Timeout for key sequence mappings
 vim.o.switchbuf = 'useopen,uselast' -- jump to already open buffers on `:cn|:cp`
 
 -- Folds
--- vim.o.foldmethod = 'indent' -- Set 'indent' folding method
--- vim.o.foldlevel = 1 -- Display all folds except top ones
--- vim.o.foldnestmax = 10 -- Create folds only for some number of nested levels
--- vim.g.markdown_folding = 1 -- Use folding by heading in markdown files
+vim.o.foldmethod = 'indent' -- Set 'indent' folding method
+vim.o.foldlevel = 1 -- Display all folds except top ones
+vim.o.foldnestmax = 10 -- Create folds only for some number of nested levels
+vim.g.markdown_folding = 1 -- Use folding by heading in markdown files
 
 -- :find path search behavior
 vim.cmd([[set path=.,,,$PWD/**]]) -- Recursive search in current dir
@@ -77,22 +78,23 @@ vim.g.loaded_node_provider = 0
 
 -- Disable some in built plugins completely
 local disabled_built_ins = {
-  "gzip",
-  "zip",
-  "zipPlugin",
-  "tar",
-  "tarPlugin",
-  "getscript",
-  "getscriptPlugin",
-  "vimball",
-  "vimballPlugin",
-  "2html_plugin",
-  "logipat",
-  "rrhelper",
-  "spellfile_plugin",
+  'gzip',
+  'zip',
+  'zipPlugin',
+  'tar',
+  'tarPlugin',
+  'getscript',
+  'getscriptPlugin',
+  'vimball',
+  'vimballPlugin',
+  '2html_plugin',
+  'logipat',
+  'rrhelper',
+  'spellfile_plugin',
 }
 for _, plugin in pairs(disabled_built_ins) do
-  vim.g["loaded_" .. plugin] = 1
+  vim.g['loaded_' .. plugin] = 1
 end
 
+vim.cmd('filetype plugin indent on') -- Enable all filetype plugins
 --------------------------------------------------------------------------------

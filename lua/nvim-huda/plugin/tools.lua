@@ -1,4 +1,5 @@
 local SCRIPTS_DIR = NH.PLUGIN_DIR .. '/script'
+
 local FZ = SCRIPTS_DIR .. '/fz'
 
 -- Make sure it's executable
@@ -13,8 +14,8 @@ local TEMPNAME = vim.fn.tempname()
 if vim.fn.executable('nnn') == 0 and vim.fn.executable('fzf') == 0 and vim.fn.executable('gitui') == 0 then return end
 
 -- Keymap  --------------------------------------------------------------------
+--
 function util.setup()
-  vim.keymap.set('n', '<Leader>e', T.explorer, { desc = 'Open directory current file' })
   vim.keymap.set('n', '<Leader>.', T.explorer, { desc = 'Open directory current file' })
 
   vim.keymap.set('n', '<Leader>f', T.find_files, { desc = 'Open file picker at cwd' })
@@ -23,8 +24,8 @@ function util.setup()
   vim.keymap.set('n', '<Leader>g/', T.grep, { desc = 'Search in workspace folder' })
   vim.keymap.set('n', '<Leader>/', T.bgrep, { desc = 'Search in current file' })
 
-  vim.keymap.set({ 'n', 'x' }, '<Leader>sg', T.grep_global, { desc = 'Search word/selection in workspace folder' })
-  vim.keymap.set({ 'n', 'x' }, '<Leader>sb', T.grep_buffer, { desc = 'Search word/selection in current file' })
+  vim.keymap.set({ 'n', 'x' }, '<Leader>g*', T.grep_global, { desc = 'Search word/selection in workspace folder' })
+  vim.keymap.set({ 'n', 'x' }, '<Leader>*', T.grep_buffer, { desc = 'Search word/selection in current file' })
 
   vim.keymap.set('n', '<Leader>xq', T.open_win_qf('q'), { desc = 'Quickfix List' })
   vim.keymap.set('n', '<Leader>xl', T.open_win_qf('l'), { desc = 'Location List' })
@@ -288,7 +289,6 @@ T.grep_buffer = function()
   local current_file = vim.api.nvim_buf_get_name(0)
   local word = vim.fn.mode() == 'n' and ' --word=' .. query or ''
   local args = string.format('--query=%s --path=%s --line=%d%s', vim.fn.shellescape(query), current_file, line, word)
-  print('DEBUG[452]: tools.lua:287: args=' .. vim.inspect(args))
   util.fzf_cmd({
     title = 'Grep Buffer',
     cmd = 'grep_buffer',

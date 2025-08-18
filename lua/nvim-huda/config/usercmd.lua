@@ -42,5 +42,11 @@ end, {
   desc = 'Toggle diff',
 })
 
+vim.api.nvim_create_user_command("PrintHighlights", function()
+  vim.cmd "redir! > highlights.txt | silent hi | redir END"
+end, {})
 
+vim.api.nvim_create_user_command("PrintRemaps", function()
+  vim.cmd "redir! > remaps.txt | silent map | redir END"
+end, {})
 --------------------------------------------------------------------------------
