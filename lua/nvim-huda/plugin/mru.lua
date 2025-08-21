@@ -65,6 +65,6 @@ vim.api.nvim_create_autocmd({ 'VimLeavePre', 'FocusLost', 'VimSuspend' }, {
   callback = function() M.write_to_file() end,
 })
 
-_G.NH.mru = M.list
+_G._my.mru = M.list
 
 return M

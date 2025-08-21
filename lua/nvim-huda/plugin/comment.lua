@@ -57,7 +57,7 @@ function M.comment_hr()
   local comment_len = #(comment_str:format(''))
   local hr_len = textwidth - (indent_len + comment_len)
 
-  local hr_char = comment_str:find('%-') and '-' or '─'
+  local hr_char = comment_str:find('%-') and '-' or '-'
   local hr_line = comment_str:format(hr_char:rep(hr_len))
 
   if not vim.list_contains(filetypes_with_padding, vim.bo.ft) then hr_line = hr_line:gsub(' ', hr_char) end
@@ -126,11 +126,13 @@ function M.add_comment(where)
 end
 
 -- Mappings
-vim.keymap.set('n', 'gci', function() insert_section('-') end, { desc = 'Insert Section' })
-vim.keymap.set('n', 'gcd', M.duplicate_line_as_comment, { desc = 'Duplicate Comment' })
-vim.keymap.set('n', 'gch', M.comment_hr, { desc = 'Comment hr' })
-vim.keymap.set('n', 'gce', function() M.add_comment('eol') end, { desc = 'Comment eol' })
-vim.keymap.set('n', 'gca', function() M.add_comment('below') end, { desc = 'Comment below' })
-vim.keymap.set('n', 'gcb', function() M.add_comment('above') end, { desc = 'Comment above' })
+map('n', 'gci', function() insert_section('-') end, { desc = 'Insert Section' })
+map('n', 'gcd', M.duplicate_line_as_comment, { desc = 'Duplicate Comment' })
+map('n', 'gch', M.comment_hr, { desc = 'Comment hr' })
+map('n', 'gce', function() M.add_comment('eol') end, { desc = 'Comment eol' })
+map('n', 'gca', function() M.add_comment('below') end, { desc = 'Comment below' })
+map('n', 'gcb', function() M.add_comment('above') end, { desc = 'Comment above' })
 
 return M
+--------------------------------------------------------------------------------
+

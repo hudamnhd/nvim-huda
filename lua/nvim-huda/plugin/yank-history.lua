@@ -111,11 +111,11 @@ function M.show_in_split()
   vim.api.nvim_buf_set_var(buf, 'yank_items', items)
 
   -- mappings
-  vim.keymap.set('n', 'j', M.move_next, { buffer = buf, unique = false })
-  vim.keymap.set('n', 'k', M.move_prev, { buffer = buf, unique = false })
-  vim.keymap.set('n', 'q', vim.cmd.bw, { buffer = buf, unique = false })
-  vim.keymap.set('n', 'd', M.delete_under_cursor, { buffer = buf, unique = false, nowait = true })
-  vim.keymap.set('n', '<CR>', M.put_item, { buffer = buf, unique = false })
+  map('n', 'j', M.move_next, { buffer = buf, unique = false })
+  map('n', 'k', M.move_prev, { buffer = buf, unique = false })
+  map('n', 'q', vim.cmd.bw, { buffer = buf, unique = false })
+  map('n', 'd', M.delete_under_cursor, { buffer = buf, unique = false, nowait = true })
+  map('n', '<CR>', M.put_item, { buffer = buf, unique = false })
 
   vim.bo[buf].filetype = 'yank_history'
   vim.bo[buf].buftype = 'nofile'
@@ -189,6 +189,6 @@ function M.delete_under_cursor()
   M.show_in_split()
 end
 
-vim.keymap.set('n', 'yh', function() M.show_in_split() end, { desc = 'Show yank history' })
+map('n', 'yh', function() M.show_in_split() end, { desc = 'Show yank history' })
 
 return M

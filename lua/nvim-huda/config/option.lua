@@ -16,11 +16,11 @@ vim.o.list = true
 vim.opt.listchars = { tab = '▏ ', trail = '·', extends = '»', precedes = '«' }
 
 if vim.fn.has('nvim-0.12') == 1 then
-  vim.o.cmdheight = 0
+  -- vim.o.cmdheight = 0
   vim.o.pummaxwidth = 30 -- Limit maximum width of popup menu
   vim.o.completefuzzycollect = 'keyword,files,whole_line' -- Use fuzzy matching when collecting candidates
 
-  require('vim._extui').enable({ enable = true })
+  require('vim._extui').enable({})
 end
 
 -- Window & Split behavior
@@ -62,10 +62,10 @@ vim.o.timeoutlen = 1000 -- Timeout for key sequence mappings
 vim.o.switchbuf = 'useopen,uselast' -- jump to already open buffers on `:cn|:cp`
 
 -- Folds
-vim.o.foldmethod = 'indent' -- Set 'indent' folding method
-vim.o.foldlevel = 1 -- Display all folds except top ones
-vim.o.foldnestmax = 10 -- Create folds only for some number of nested levels
-vim.g.markdown_folding = 1 -- Use folding by heading in markdown files
+-- vim.o.foldmethod = 'indent' -- Set 'indent' folding method
+-- vim.o.foldlevel = 1 -- Display all folds except top ones
+-- vim.o.foldnestmax = 10 -- Create folds only for some number of nested levels
+-- vim.g.markdown_folding = 1 -- Use folding by heading in markdown files
 
 -- :find path search behavior
 vim.cmd([[set path=.,,,$PWD/**]]) -- Recursive search in current dir

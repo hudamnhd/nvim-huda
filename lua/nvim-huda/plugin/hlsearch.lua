@@ -1,7 +1,7 @@
 --------------------------------------------------------------------------------
 -- Auto nohl
 --------------------------------------------------------------------------------
-local ns_id = vim.api.nvim_create_namespace('NHAutoNohl')
+local ns_id = vim.api.nvim_create_namespace('nvimhuda/autonohl')
 
 --- Shows virtual text with search match count
 ---@param mode? "clear"
@@ -24,13 +24,14 @@ local function show_search_count(mode)
   })
 end
 
-vim.keymap.set('', '*', function()
+vim.keymap.set({ 'n', 'x' }, '*', function()
   if vim.fn.mode():match('[n]') then
     local text = vim.fn.expand('<cword>')
     vim.fn.setreg('/', '\\<' .. text .. '\\>')
   elseif vim.fn.mode():match('[v]') then
     local text = get_visual_selection(false)
     vim.fn.setreg('/', '\\V' .. text)
+    vim.cmd('normal! ')
   end
   vim.opt.hlsearch = true
   show_search_count()

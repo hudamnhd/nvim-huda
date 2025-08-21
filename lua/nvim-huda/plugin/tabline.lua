@@ -3,7 +3,7 @@
 --------------------------------------------------------------------------------
 local tabline = {
   buffer_state = {},
-  namespace = vim.api.nvim_create_namespace('tabline'),
+  ns_id = vim.api.nvim_create_namespace('nvimhuda/bufferlist'),
 }
 
 function tabline.relpath(path)
@@ -24,46 +24,6 @@ function tabline.get_current_index()
   return nil
 end
 
----@param opts vim.api.keyset.win_config
----@return { win_id: integer, buf_id: integer, prev_win_id: integer, close_win: fun() }
-function tabline.win_open(opts)
-  local prev_win_id = vim.api.nvim_get_current_win()
-  local buf_id = vim.api.nvim_create_buf(false, true)
-
-  vim.bo[buf_id].bufhidden = 'wipe'
-  vim.bo[buf_id].buftype = 'nofile'
-
-  local columns = vim.o.columns
-  local lines = vim.o.lines
-  local width = math.floor(columns * 0.9)
-  local height = math.floor(lines * 0.59)
-  local default_opts = {
-    relative = 'editor',
-    style = 'minimal',
-    row = math.floor((lines - height) * 0.5),
-    col = math.floor((columns - width) * 0.5),
-    width = width,
-    height = height,
-    border = 'single',
-    title = '',
-    title_pos = 'center',
-  }
-
-  local win_opts = vim.tbl_deep_extend('force', default_opts, opts or {})
-  local win_id = vim.api.nvim_open_win(buf_id, true, win_opts)
-  local close_win = function()
-    if vim.api.nvim_win_is_valid(prev_win_id) then vim.api.nvim_set_current_win(prev_win_id) end
-    if vim.api.nvim_buf_is_valid(buf_id) then vim.api.nvim_buf_delete(buf_id, { force = true }) end
-  end
-
-  return {
-    win_id = win_id,
-    buf_id = buf_id,
-    prev_win_id = prev_win_id,
-    close_win = close_win,
-  }
-end
-
 -- Open buffer listed ----------------------------------------------------------
 function tabline.open_buffer_list()
   if #tabline.buffer_state == 0 then
@@ -72,7 +32,9 @@ function tabline.open_buffer_list()
   end
 
   local current_path = tabline.relpath(vim.api.nvim_buf_get_name(0))
-  local win = tabline.win_open({ title = 'Buffer' })
+  local win = require('nvim-huda.util').win_open(
+    vim.tbl_deep_extend('force', require('nvim-huda.util').get_float_opts('sm'), { title = 'Buffer' })
+  )
 
   vim.wo[win.win_id].number = true
   vim.api.nvim_set_option_value('buftype', 'nofile', { buf = win.buf_id })
@@ -101,19 +63,20 @@ function tabline.open_buffer_list()
     local fname_start = line:find('[^/]+$') or 1
     local fname_end = #line
     if fname_start > 1 then
-      vim.api.nvim_buf_set_extmark(win.buf_id, tabline.namespace, i - 1, 0, {
+      vim.api.nvim_buf_set_extmark(win.buf_id, tabline.ns_id, i - 1, 0, {
         end_col = fname_start - 1,
         hl_group = 'Comment',
       })
     end
-    vim.api.nvim_buf_set_extmark(win.buf_id, tabline.namespace, i - 1, fname_start - 1, {
+    vim.api.nvim_buf_set_extmark(win.buf_id, tabline.ns_id, i - 1, fname_start - 1, {
       end_col = fname_end,
       hl_group = 'Title',
     })
   end
 
   -- Keymaps
-  vim.keymap.set('n', 'q', win.close_win, { buffer = win.buf_id, nowait = true })
+  map('n', 'q', win.close_win, { buffer = win.buf_id, nowait = true })
+  map('n', '<F1>', win.close_win, { buffer = win.buf_id, nowait = true })
 
   local function enter(line_nr)
     if type(line_nr) ~= 'number' then return end
@@ -139,10 +102,10 @@ function tabline.open_buffer_list()
 
   local function buf_enter() enter(vim.api.nvim_win_get_cursor(0)[1]) end
 
-  vim.keymap.set('n', '<CR>', buf_enter, { buffer = win.buf_id, desc = 'Open buffer under cursor' })
-  vim.keymap.set('n', 'l', buf_enter, { buffer = win.buf_id, desc = 'Open buffer under cursor' })
+  map('n', '<CR>', buf_enter, { buffer = win.buf_id, desc = 'Open buffer under cursor' })
+  map('n', 'l', buf_enter, { buffer = win.buf_id, desc = 'Open buffer under cursor' })
 
-  vim.keymap.set('n', '=', function()
+  map('n', '=', function()
     local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 
     local old_paths = {}
@@ -154,7 +117,7 @@ function tabline.open_buffer_list()
     local filtered = {}
     for _, file in ipairs(lines) do
       local bufnr = vim.fn.bufnr(file)
-      local real = vim.loop.fs_realpath(file)
+      local real = vim.uv.fs_realpath(file)
       local stat = real and vim.loop.fs_stat(real)
       if stat and stat.type == 'file' then
         if bufnr == -1 then
@@ -176,7 +139,7 @@ function tabline.open_buffer_list()
     tabline.buffer_state = filtered
     vim.notify('Updated buffer list.')
   end, { buffer = win.buf_id })
-  local ns_id = vim.api.nvim_create_namespace('BufferJump')
+  local ns_id = vim.api.nvim_create_namespace('nvimhuda/bufferjump')
 
   for i, _ in ipairs(lines) do
     vim.api.nvim_buf_set_extmark(win.buf_id, ns_id, i - 1, 0, {
@@ -200,7 +163,7 @@ end
 
 tabline.buffer_seen = {}
 
-function tabline.open_buf_with_click(bufnr) vim.api.nvim_set_current_buf(bufnr) end
+function tabline.click_tabline(bufnr) vim.api.nvim_set_current_buf(bufnr) end
 
 -- Render tabline --------------------------------------------------------------
 function tabline.render_buffer()
@@ -238,7 +201,7 @@ function tabline.render_buffer()
       end
 
       local label = string.format('%d %s%s', i, short_name, suffix)
-      local click = string.format('%%%d@v:lua.NH.open_buf_with_click@ ', bufnr)
+      local click = string.format('%%%d@v:lua._my.click_tabline@ ', bufnr)
 
       line = line .. hl .. click .. label .. ' ' .. '%X'
     end
@@ -249,7 +212,7 @@ end
 
 -- Setup keymap, opt and autocmd -----------------------------------------------
 tabline.setup = function()
-  vim.keymap.set('n', '<Leader>b', tabline.open_buffer_list, { desc = 'Buffer list' })
+  map('n', '<F1>', tabline.open_buffer_list, { desc = 'Buffer list' })
 
   function next_state()
     local count = vim.v.count1
@@ -281,16 +244,16 @@ tabline.setup = function()
     if type(target) == 'table' then vim.api.nvim_set_current_buf(target.idbuf) end
   end
 
-  vim.keymap.set('n', ']b', next_state, { desc = 'Buffer next' })
-  vim.keymap.set('n', '[b', prev_state, { desc = 'Buffer prev' })
+  map('n', '<F2>', prev_state, { desc = 'Buffer prev' })
+  map('n', '<F3>', next_state, { desc = 'Buffer next' })
+  map('n', '<F4>', vim.cmd.bd, { desc = 'Buffer delete' })
 
   -- Leader + number(1-9) for navigate bufferline
-  -- local keys = '+[{(&=)}]'
   local keys = '123456789'
   for i = 1, #keys do
     local key = keys:sub(i, i)
     local key_combination = string.format('<Leader>%s', key)
-    vim.keymap.set('n', key_combination, function()
+    map('n', key_combination, function()
       local target = tabline.buffer_state[i]
       if type(target) == 'table' then
         vim.api.nvim_set_current_buf(target.idbuf)
@@ -333,16 +296,15 @@ tabline.setup = function()
   })
 end
 
-
-_G.NH.open_buf_with_click = tabline.open_buf_with_click
-_G.NH.render_buffer = tabline.render_buffer
+_G._my.click_tabline = tabline.click_tabline
+_G._my.tabline = tabline.render_buffer
 
 vim.api.nvim_create_autocmd('UIEnter', {
   once = true,
   callback = vim.schedule_wrap(function()
     -- show bufferline via tabline
     vim.o.showtabline = 2
-    vim.o.tabline = '%!v:lua.NH.render_buffer()'
+    vim.o.tabline = '%!v:lua._my.tabline()'
     tabline.setup()
   end),
 })

@@ -127,53 +127,15 @@ function bookmark.open(index)
   if current_file ~= path then vim.cmd('e +' .. line .. ' ' .. vim.fn.fnameescape(path)) end
 end
 
-local ns_id = vim.api.nvim_create_namespace('bookmark_ns')
-
----@param opts vim.api.keyset.win_config
----@return { win_id: integer, buf_id: integer, prev_win_id: integer, close_win: fun() }
-local function win_open(opts)
-  local prev_win_id = vim.api.nvim_get_current_win()
-  local buf_id = vim.api.nvim_create_buf(false, true)
-
-  vim.bo[buf_id].bufhidden = 'wipe'
-  vim.bo[buf_id].buftype = 'nofile'
-
-  local columns = vim.o.columns
-  local lines = vim.o.lines
-  local width = math.floor(columns * 0.9)
-  local height = math.floor(lines * 0.59)
-  local default_opts = {
-    relative = 'editor',
-    style = 'minimal',
-    row = math.floor((lines - height) * 0.5),
-    col = math.floor((columns - width) * 0.5),
-    width = width,
-    height = height,
-    border = 'single',
-    title = '',
-    title_pos = 'center',
-  }
-
-  local win_opts = vim.tbl_deep_extend('force', default_opts, opts or {})
-  local win_id = vim.api.nvim_open_win(buf_id, true, win_opts)
-  local close_win = function()
-    if vim.api.nvim_win_is_valid(prev_win_id) then vim.api.nvim_set_current_win(prev_win_id) end
-    if vim.api.nvim_buf_is_valid(buf_id) then vim.api.nvim_buf_delete(buf_id, { force = true }) end
-  end
-
-  return {
-    win_id = win_id,
-    buf_id = buf_id,
-    prev_win_id = prev_win_id,
-    close_win = close_win,
-  }
-end
+local ns_id = vim.api.nvim_create_namespace('nvimhuda/bookmark')
 
 function bookmark.edit()
   local data, bookmark, map_id = bookmark.data()
   if #bookmark == 0 then return vim.notify('bookmark is empty.', vim.log.levels.WARN) end
 
-  local win = win_open({ title = 'Bookmark' })
+  local win = require('nvim-huda.util').win_open(
+    vim.tbl_deep_extend('force', require('nvim-huda.util').get_float_opts('sm'), { title = 'Bookmark' })
+  )
 
   vim.wo[win.win_id].number = true
 
@@ -265,13 +227,13 @@ end
 --------------------------------------------------------------------------------
 function bookmark.setup()
   -- Keymap
-  vim.keymap.set('n', '<Leader>a', function() bookmark.add() end, { desc = 'Add bookmark' })
-  vim.keymap.set('n', '<Leader>A', function() bookmark.del() end, { desc = 'Del bookmark' })
-  vim.keymap.set('n', '<Leader>h', function() bookmark.edit() end, { desc = 'Edit bookmark' })
-  vim.keymap.set('n', '<A-1>', function() bookmark.open(1) end, { desc = 'Go bookmark 1' })
-  vim.keymap.set('n', '<A-2>', function() bookmark.open(2) end, { desc = 'Go bookmark 2' })
-  vim.keymap.set('n', '<A-3>', function() bookmark.open(3) end, { desc = 'Go bookmark 3' })
-  vim.keymap.set('n', '<A-4>', function() bookmark.open(4) end, { desc = 'Go bookmark 4' })
+  map('n', '<Leader>ba', function() bookmark.del() end, { desc = 'Del bookmark' })
+  map('n', '<Leader>bd', function() bookmark.add() end, { desc = 'Add bookmark' })
+  map('n', '<Leader>be', function() bookmark.edit() end, { desc = 'Edit bookmark' })
+  map('n', '<Leader>b1', function() bookmark.open(1) end, { desc = 'Go bookmark 1' })
+  map('n', '<Leader>b2', function() bookmark.open(2) end, { desc = 'Go bookmark 2' })
+  map('n', '<Leader>b3', function() bookmark.open(3) end, { desc = 'Go bookmark 3' })
+  map('n', '<Leader>b4', function() bookmark.open(4) end, { desc = 'Go bookmark 4' })
 
   local current_file
 

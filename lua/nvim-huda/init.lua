@@ -1,7 +1,7 @@
 local M = {}
 
 -- Setup global namespace
-_G.NH = _G.NH or {}
+_G._my = {}
 
 -- Pretty print helper (globally accessible)
 function _G.P(...)
@@ -16,12 +16,12 @@ end
 -- Determine plugin root directory
 local FILE_PATH = debug.getinfo(1, 'S').source:sub(2)
 local PLUGIN_DIR = vim.fn.fnamemodify(FILE_PATH, ':p:h:h:h')
-NH.PLUGIN_DIR = PLUGIN_DIR -- Assign to global namespace
+_my.PLUGIN_DIR = PLUGIN_DIR -- Assign to global namespace
 
 --- Load all Lua modules from a subdirectory inside the plugin's Lua folder
 ---@param subdir string
 function M.load(subdir)
-  local full_path = vim.fs.normalize(NH.PLUGIN_DIR .. '/lua/' .. subdir)
+  local full_path = vim.fs.normalize(_my.PLUGIN_DIR .. '/lua/' .. subdir)
 
   -- Early exit if directory doesn't exist
   if vim.fn.isdirectory(full_path) == 0 then
@@ -38,11 +38,29 @@ function M.load(subdir)
   end
 end
 
+-- Keymap wrapper
+do
+  local mode_key = { n = true, i = true, v = true, x = true, s = true, o = true, c = true, t = true }
+
+  ---@param mode_str string
+  local parse_mode = function(mode_str)
+    local mode = {}
+    for i = 1, #mode_str do
+      local char = mode_str:sub(i, i)
+      if mode_key[char] then table.insert(mode, char) end
+    end
+    return mode
+  end
+
+  _G.map = function(mode, lhs, rhs, opts)
+    return vim.keymap.set(type(mode) == 'string' and parse_mode(mode) or mode, lhs, rhs, opts or {})
+  end
+end
+
 --- Entry point: load all plugin modules
 function M.setup()
   vim.g.nvimhuda_is_loaded = vim.g.nvimhuda_is_loaded or false
   if not vim.g.nvimhuda_is_loaded then
-    P(vim.g.nvimhuda_is_loaded)
     M.load('nvim-huda/config')
     M.load('nvim-huda/plugin')
     vim.g.nvimhuda_is_loaded = true

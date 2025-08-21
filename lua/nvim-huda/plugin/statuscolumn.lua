@@ -22,6 +22,6 @@ sc.statuscolumn = function()
   })
 end
 
-_G.NH.statuscolumn = sc.statuscolumn
-vim.o.statuscolumn = '%!v:lua.NH.statuscolumn()'
+-- _G._my.statuscolumn = sc.statuscolumn
+-- vim.o.statuscolumn = '%!v:lua._my.statuscolumn()'
 --------------------------------------------------------------------------------

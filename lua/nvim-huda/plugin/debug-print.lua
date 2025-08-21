@@ -68,7 +68,7 @@ function M.setup()
     'n',
     '<Leader>cw',
     function() M.insert_debugprint(vim.fn.expand('<cword>')) end,
-    { desc = 'Code word debug print' }
+    { desc = 'Debug print' }
   )
 end
 

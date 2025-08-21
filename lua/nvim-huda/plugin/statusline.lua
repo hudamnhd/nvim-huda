@@ -1,28 +1,15 @@
 --------------------------------------------------------------------------------
 -- Statusline
 --------------------------------------------------------------------------------
-
--- Map Neovim mode ke nama human-readable
+-- stylua: ignore
 local mode_alias = {
-  n = 'Normal',
-  niI = 'Normal',
-  niR = 'Normal',
-  niV = 'Normal',
-  nt = 'Normal',
-  v = 'Visual',
-  V = 'V-Line',
-  ['\x16'] = 'V-Block',
-  i = 'Insert',
-  ic = 'Insert',
-  R = 'Replace',
-  Rv = 'V-Replace',
-  c = 'Command',
-  s = 'Select',
-  S = 'S-Line',
-  ['\x13'] = 'S-Block',
-  t = 'Terminal',
-  cv = 'Ex',
-  ce = 'Ex',
+  n = 'Normal',  niI = 'Normal', niR = 'Normal', niV = 'Normal', nt = 'Normal',
+  v = 'Visual',  V = 'V-Line',   ['\x16'] = 'V-Block',
+  i = 'Insert',  ic = 'Insert',
+  R = 'Replace', Rv = 'V-Replace',
+  cv = 'Ex',     ce = 'Ex',
+  s = 'Select',  S = 'S-Line',   ['\x13'] = 'S-Block',
+  c = 'Command', t = 'Terminal',
 }
 
 -- Cache state
@@ -95,33 +82,32 @@ end
 
 -- Statusline format -----------------------------------------------------------
 local components = {
-  ' %{v:lua.NH.stl.get_mode()}%*',
+  ' %{v:lua._my.stl.get_mode()}%*',
   ":%{(&modified&&&readonly?'%*':(&modified?'**':(&readonly?'%%':'--')))}",
   ' %P (%#StatusLineNr#%l%*,%02c) ',
   '%t',
-  ' %{v:lua.NH.stl.get_branch()}%*',
-  ' %{v:lua.NH.stl.get_diff()}%*',
-  ' %{v:lua.NH.stl.get_diagnostic()}%*',
+  ' %{v:lua._my.stl.get_branch()}%*',
+  ' %{v:lua._my.stl.get_diff()}%*',
+  ' %{v:lua._my.stl.get_diagnostic()}%*',
   ' %=',
   '%y ',
   '%{&ff} ',
   '%{&fenc?&fenc:&enc} ',
 }
 
-
-_G.NH.stl = {
+_G._my.stl = {
   get_mode = get_mode,
   get_branch = function() return branch end,
   get_diff = function() return diff_info end,
   get_diagnostic = function() return diagnostic end,
-  statusline = function() return table.concat(components) end,
 }
+_G._my.statusline = function() return table.concat(components) end
 
 vim.api.nvim_create_autocmd('UIEnter', {
   once = true,
   callback = vim.schedule_wrap(function()
     branch = get_branch()
-    vim.opt.statusline = '%{%v:lua.NH.stl.statusline()%}'
+    vim.opt.statusline = '%{%v:lua._my.statusline()%}'
     vim.api.nvim_set_hl(0, 'StatusLineNr', { bold = true })
   end),
 })
